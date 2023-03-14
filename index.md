@@ -9,5 +9,6 @@ Contents
 ```{toctree}
 :titlesonly:
 
+doc/introduction
 doc/demo
 ```

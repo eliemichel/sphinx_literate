@@ -36,7 +36,7 @@ std::cout << "Hello world" << std::endl;
 {{Main return}}
 ```
 
-```{lit} cmake, file: CMakeLists.txt
+```{lit} CMake, file: CMakeLists.txt
 :emphasize-lines: 2, 3
 project(Example)
 add_executable(

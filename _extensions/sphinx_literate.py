@@ -124,38 +124,15 @@ class CodeblockRegistry:
 #############################################################
 # Elements
 
-# This is totally a hack for being able to call SphinxDirectives from
-# the doctree-resolved event callback.
-class MockReporter:
-    pass
-class MockStateMachine:
-    def __init__(self, document):
-        self.document = document
-        self.reporter = document.reporter
-    def get_source_and_line(self, lineno = None):
-        return self.document["source"], lineno or 0
-class MockState:
-    def __init__(self, state_machine):
-        self.document = state_machine.document
-
 class TangleNode(nodes.General, nodes.Element):
-    def __init__(self, root_block_name, lexer, docname, lineno, state_machine_proto, state_proto, *args):
+    def __init__(self, root_block_name, lexer, docname, lineno, raw_block_node, *args):
         self.lexer = lexer
         self.root_block_name = root_block_name
         self.docname = docname
         self.lineno = lineno
-
-        self._document = state_machine_proto.document
+        self.raw_block_node = raw_block_node
 
         super().__init__(*args)
-
-    def state_machine_factory(self):
-        return MockStateMachine(self._document)
-
-    def state_factory(self, state_machine):
-        #state = deepcopy(self._state_proto)
-        #state.state_machine = state_machine
-        return MockState(state_machine)
 
 class LiterateHighlighter:
     """
@@ -335,7 +312,7 @@ class DirectiveMixin:
             )
             raise ExtensionError(message, modname="sphinx_literate")
 
-class TangleDirective(SphinxDirective, DirectiveMixin):
+class TangleDirective(SphinxCodeBlock, DirectiveMixin):
 
     required_arguments = 1
     optional_arguments = 0
@@ -343,14 +320,21 @@ class TangleDirective(SphinxDirective, DirectiveMixin):
 
     def run(self):
         self.parse_arguments()
-        return [TangleNode(
-            self.arg_name,
-            self.arg_lexer,
-            self.env.docname,
-            self.lineno,
-            self.state_machine,
-            self.state
-        )]
+
+        self.content = StringList(["Hello, world"])
+        self.arguments = [self.arg_lexer] if self.arg_lexer is not None else []
+
+        raw_block_node = super().run()[0]
+
+        return [
+            TangleNode(
+                self.arg_name,
+                self.arg_lexer,
+                self.env.docname,
+                self.lineno,
+                raw_block_node
+            )
+        ]
 
 class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
 
@@ -492,23 +476,15 @@ def process_literate_nodes(app, doctree, fromdocname):
         if lexer is None:
             lexer = lit.lexer
 
-        # FIXME we can create this SphinxCodeBlock in the directive and just
-        # edit its source here as it has not been visited yet.
-        state_machine = tangle_node.state_machine_factory()
-        state = tangle_node.state_factory(state_machine)
-        code_block = SphinxCodeBlock(
-            "", # name
-            [lexer] if lexer is not None else [],  # arguments
-            {},  # options
-            tangled_content,  # content
-            0,  # lineno
-            0,  # content_offset
-            "",  # block_text
-            state,  # state
-            state_machine,  # state_machine
-        ).run()[0]
+        block_node = tangle_node.raw_block_node
+        block_node.args = [lexer] if lexer is not None else []
+        block_node.rawsource = '\n'.join(tangled_content)
+        if lexer is not None:
+            block_node['language'] = lexer
+        block_node.children.clear()
+        block_node.children.append(nodes.Text(block_node.rawsource))
 
-        tangle_node.replace_self([para, code_block])
+        tangle_node.replace_self([para, block_node])
 
 def setup(app):
     app.add_config_value("lit_begin_ref", "{{", 'html', [str])
