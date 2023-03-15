@@ -43,7 +43,6 @@ content must be saved, relative to the root tangle directory.
 """
 
 from docutils import nodes
-from docutils.nodes import Node
 from docutils.parsers import rst
 from docutils.parsers.rst import Directive
 from docutils.statemachine import StringList, State, StateMachine
@@ -53,77 +52,17 @@ from sphinx.locale import _
 from sphinx.util.docutils import SphinxDirective
 from sphinx.errors import ExtensionError
 from sphinx.directives.code import CodeBlock as SphinxCodeBlock
-from sphinx.builders import Builder
-from sphinx.locale import __
 
 from dataclasses import dataclass
-from typing import Any, Iterator, Set, Optional
 from copy import deepcopy
 import re
 import random
 import html
 import os
 
-#############################################################
-# Codeblock registry
-
-@dataclass
-class Codeblock:
-    """
-    Data store about a code block parsed from a {lit} directive, to be
-    assembled when tangling.
-    """
-    name: str = ""
-    docname: str = ""
-    lineno: int = -1
-    content: str = ""
-    target: Any = None
-    lexer: str | None = None
-
-    @property
-    def key(self):
-        # TODO: Add config option to scope blocks per document
-        return self.name
-
-class CodeblockRegistry:
-    """
-    Holds the various code blocks and prevents duplicates.
-    NB: Do not create this yourself, call CodeblockRegistry.from_env(env)
-    """
-
-    @classmethod
-    def from_env(cls, env):
-        if not hasattr(env, 'lit_codeblocks'):
-            env.lit_codeblocks = CodeblockRegistry()
-        return env.lit_codeblocks
-
-    def __init__(self):
-        self._blocks = {}
-
-    def add_codeblock(self, lit: Codeblock):
-        key = lit.key
-        existing = self._blocks.get(key)
-        if existing is not None:
-            message = (
-                f"Multiple literate code blocks with the same name '{key}' were found:\n" +
-                f"  - In document '{existing.docname}', line {existing.lineno}.\n"
-                f"  - In document '{lit.docname}', line {lit.lineno}.\n"
-            )
-            raise ExtensionError(message, modname="sphinx_literate")
-        self._blocks[key] = lit
-
-    def remove_codeblocks_by_docname(self, docname):
-        self._blocks = {
-            key: lit
-            for key, lit in self._blocks.items()
-            if lit.docname != docname
-        }
-
-    def blocks(self):
-        return self._blocks.values()
-
-    def get(self, key):
-        return self._blocks.get(key)
+from .builder import TangleBuilder
+from .registry import CodeBlock, CodeBlockRegistry
+from .tangle import tangle
 
 #############################################################
 # Elements
@@ -263,38 +202,6 @@ class LiterateNode(nodes.General, nodes.Element):
         return literal_block_handlers
 
 #############################################################
-# Tangle
-
-def tangle(registry, tangled_content, lit_content, begin_ref, end_ref, prefix=""):
-    for line in lit_content:
-        subprefix = None
-        key = None
-        begin_offset = line.find(begin_ref)
-        if begin_offset != -1:
-            end_offset = line.find(end_ref, begin_offset)
-            if end_offset != -1:
-                subprefix = line[:begin_offset]
-                key = line[begin_offset+len(begin_ref):end_offset]
-        if key is not None:
-            sublit = registry.get(key)
-            if sublit is None:
-                message = (
-                    f"Literate code block not found: '{key}' " +
-                    f"(in tangle directive from document {node.docname}, line {node.lineno})"
-                )
-                raise ExtensionError(message, modname="sphinx_literate")
-            tangle(
-                registry,
-                tangled_content,
-                sublit.content,
-                begin_ref,
-                end_ref,
-                prefix=prefix + subprefix
-            )
-        else:
-            tangled_content.append(prefix + line)
-
-#############################################################
 # Directives
 
 class DirectiveMixin:
@@ -384,7 +291,7 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
         return [targetnode, block_node]
 
     def register_lit(self, targetnode):
-        self.lit = Codeblock(
+        self.lit = CodeBlock(
             name=self.arg_name,
             docname=self.env.docname,
             lineno=self.lineno,
@@ -393,7 +300,7 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
             lexer=self.arg_lexer,
         )
 
-        lit_codeblocks = CodeblockRegistry.from_env(self.env)
+        lit_codeblocks = CodeBlockRegistry.from_env(self.env)
         lit_codeblocks.add_codeblock(self.lit)
 
     def parse_content(self):
@@ -426,17 +333,17 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
         self.parsed_source += rawsource[offset:]
 
 def purge_lit_codeblocks(app, env, docname):
-    lit_codeblocks = CodeblockRegistry.from_env(env)
+    lit_codeblocks = CodeBlockRegistry.from_env(env)
     lit_codeblocks.remove_codeblocks_by_docname(docname)
 
 def merge_lit_codeblocks(app, env, docnames, other):
-    lit_codeblocks = CodeblockRegistry.from_env(env)
+    lit_codeblocks = CodeBlockRegistry.from_env(env)
 
-    for lit in CodeblockRegistry.from_env(other).blocks():
+    for lit in CodeBlockRegistry.from_env(other).blocks():
         lit_codeblocks.add_codeblock(lit)
 
 def process_literate_nodes(app, doctree, fromdocname):
-    lit_codeblocks = CodeblockRegistry.from_env(app.builder.env)
+    lit_codeblocks = CodeBlockRegistry.from_env(app.builder.env)
 
     for literate_node in doctree.findall(LiterateNode):
         literate_node.hashcode_to_lit = {
@@ -467,13 +374,10 @@ def process_literate_nodes(app, doctree, fromdocname):
         
         para += nodes.Text("]")
 
-        tangled_content = []
-        tangle(
+        tangled_content = tangle(
+            tangle_node.root_block_name,
             lit_codeblocks,
-            tangled_content,
-            lit.content,
-            app.config.lit_begin_ref,
-            app.config.lit_end_ref,
+            app.config,
         )
 
         lexer = tangle_node.lexer
@@ -489,49 +393,6 @@ def process_literate_nodes(app, doctree, fromdocname):
         block_node.children.append(nodes.Text(block_node.rawsource))
 
         tangle_node.replace_self([para, block_node])
-
-#############################################################
-# Builder
-
-class TangleBuilder(Builder):
-    name = 'tangle'
-    format = 'tangle'
-    epilog = __('The HTML pages are in %(outdir)s.')
-
-    def init(self) -> None:
-        pass
-
-    def get_outdated_docs(self) -> Iterator[str]:
-        print(f"get_outdated_docs()")
-        for docname in self.env.found_docs:
-            if docname not in self.env.all_docs:
-                yield docname
-                continue
-            targetname = os.path.join(self.outdir, docname + self.out_suffix)
-            try:
-                targetmtime = path.getmtime(targetname)
-            except Exception:
-                targetmtime = 0
-            try:
-                srcmtime = path.getmtime(self.env.doc2path(docname))
-                if srcmtime > targetmtime:
-                    yield docname
-            except OSError:
-                # source doesn't exist anymore
-                pass
-
-    def get_target_uri(self, docname: str, typ: Optional[str] = None) -> str:
-        print(f"get_target_uri(docname={docname}, typ={typ})")
-        return ""
-
-    def prepare_writing(self, docnames: Set[str]) -> None:
-        print(f"prepare_writing(docnames={docnames})")
-
-    def write_doc(self, docname: str, doctree: Node) -> None:
-        print(f"write_doc(docname={docname}, doctree=...)")
-
-    def finish(self) -> None:
-        print("finish")
 
 #############################################################
 # Setup
