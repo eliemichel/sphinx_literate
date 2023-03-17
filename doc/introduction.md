@@ -46,8 +46,8 @@ When the block name starts with "file:", the block is considered as the root
 and the remaining of the name is the path of the file into which the tangled
 content must be saved, relative to the root tangle directory.
 
-Setup
------
+Local setup
+-----------
 
 The `lit-setup` directive can be used to setup local options.
 

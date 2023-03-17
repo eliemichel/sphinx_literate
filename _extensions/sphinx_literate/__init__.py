@@ -65,6 +65,7 @@ from .registry import CodeBlock, CodeBlockRegistry
 from .tangle import tangle
 from .directives import setup as setup_directives
 from .config import setup as setup_config
+from .parse import parse_block_content
 
 #############################################################
 # Elements
@@ -261,7 +262,7 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
 
     def run(self):
         self.parse_arguments()
-        self.parse_content()
+        self.parsed_content = parse_block_content(self.content, self.config)
         self.tangle_root = self.env.temp_data.get('tangle-root')
 
         targetid = 'lit-%d' % self.env.new_serialno('lit')
@@ -270,16 +271,16 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
         self.register_lit(targetnode)
 
         # Call parent for generating a regular code block
-        self.content = StringList(self.parsed_source.split('\n'))
+        self.content = StringList(self.parsed_content.content)
         self.arguments = [self.arg_lexer] if self.arg_lexer is not None else []
 
         raw_block_node = super().run()[0]
 
         def postprocess_literal_node(raw_literal_node):
             literate_node = LiterateNode(raw_literal_node, self.lit)
-            literate_node.hashcode_to_blockname = {
-                CodeBlock.build_key(name, self.tangle_root)
-                for k, name in self.hashcode_to_blockname.items()
+            literate_node.hashcode_to_block_key = {
+                uid: CodeBlock.build_key(name, self.tangle_root)
+                for uid, name in self.parsed_content.uid_to_block_name.items()
             }
             return literate_node
 
@@ -312,35 +313,6 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
 
         lit_codeblocks = CodeBlockRegistry.from_env(self.env)
         lit_codeblocks.add_codeblock(self.lit)
-
-    def parse_content(self):
-        """
-        This reads the raw source code and extracts {{references}} to other blocks.
-        Populate self.parsed_source and self.hashcode_to_blockname
-        """
-        rawsource = '\n'.join(self.content)
-
-        # Pre-process: We replace all code refs with a random hash, not to
-        # disturb the syntax highlighter.
-        offset = 0
-        self.parsed_source = ""
-        self.hashcode_to_blockname = {}
-        begin_ref = self.config.lit_begin_ref
-        end_ref = self.config.lit_end_ref
-        while True:
-            begin_offset = rawsource.find(begin_ref, offset)
-            if begin_offset == -1:
-                break
-            end_offset = rawsource.find(end_ref, begin_offset)
-            if end_offset == -1:
-                break
-            hashcode = "_" + "".join([random.choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") for _ in range(32)])
-            blockname = rawsource[begin_offset+len(begin_ref):end_offset]
-            self.hashcode_to_blockname[hashcode] = blockname
-            self.parsed_source += rawsource[offset:begin_offset]
-            self.parsed_source += hashcode
-            offset = end_offset + len(end_ref)
-        self.parsed_source += rawsource[offset:]
 
 def purge_lit_codeblocks(app, env, docname):
     lit_codeblocks = CodeBlockRegistry.from_env(env)
@@ -409,8 +381,6 @@ def process_literate_nodes(app, doctree, fromdocname):
 # Setup
 
 def setup(app):
-    app.add_config_value("lit_begin_ref", "{{", 'html', [str])
-    app.add_config_value("lit_end_ref", "}}", 'html', [str])
     setup_config(app)
 
     app.add_node(TangleNode)
