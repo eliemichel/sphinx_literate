@@ -65,8 +65,6 @@ class TangleBuilder(Builder):
             filename = path.join(lit.tangle_root, filename)
 
         tangled_content = tangle(lit.name, lit.tangle_root, lit_codeblocks, self.app.config)
-        print("===========")
-        print('\n'.join(tangled_content))
 
         outfilename = path.join(self.outdir, filename)
         ensuredir(path.dirname(outfilename))

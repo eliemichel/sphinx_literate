@@ -51,6 +51,16 @@ def tangle(
     lit_codeblocks: CodeBlockRegistry,
     config # sphinx app config
 ) -> List[str]:
+    """
+    Tangle a given code block, i.e. resolve all the references to generate a
+    full code without any more pending reference in it.
+    @param block_name the name of the block to tangle
+    @param tangle_root the name of the root directory: two code blocks with the
+           same name may exist only if they belong to different root directories.
+    @param lit_codeblocks the registry containing all the code blocks extracted
+           from the source documentation.
+    @return the generated source code as a list of lines
+    """
     lit = lit_codeblocks.get(block_name, tangle_root)
     if lit is None:
         message = (

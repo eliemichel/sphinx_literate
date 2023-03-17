@@ -64,6 +64,7 @@ from .builder import TangleBuilder
 from .registry import CodeBlock, CodeBlockRegistry
 from .tangle import tangle
 from .directives import setup as setup_directives
+from .config import setup as setup_config
 
 #############################################################
 # Elements
@@ -410,6 +411,7 @@ def process_literate_nodes(app, doctree, fromdocname):
 def setup(app):
     app.add_config_value("lit_begin_ref", "{{", 'html', [str])
     app.add_config_value("lit_end_ref", "}}", 'html', [str])
+    setup_config(app)
 
     app.add_node(TangleNode)
     app.add_node(LiterateNode, **LiterateNode.build_translation_handlers(app))
