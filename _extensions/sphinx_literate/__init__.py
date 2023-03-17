@@ -51,13 +51,11 @@ import sphinx
 from sphinx.locale import _
 from sphinx.util.docutils import SphinxDirective
 from sphinx.errors import ExtensionError
-from sphinx.directives.code import CodeBlock as SphinxCodeBlock
 
 from dataclasses import dataclass
 from copy import deepcopy
 import re
 import random
-import html
 import os
 
 from .builder import TangleBuilder
@@ -65,254 +63,12 @@ from .registry import CodeBlock, CodeBlockRegistry
 from .tangle import tangle
 from .directives import setup as setup_directives
 from .config import setup as setup_config
-from .parse import parse_block_content
+from .nodes import setup as setup_nodes
+from .nodes import LiterateNode, TangleNode
 
-#############################################################
-# Elements
+from docutils import nodes
 
-class TangleNode(nodes.General, nodes.Element):
-    def __init__(self, root_block_name, lexer, docname, lineno, raw_block_node, tangle_root, *args):
-        self.lexer = lexer
-        self.root_block_name = root_block_name
-        self.docname = docname
-        self.lineno = lineno
-        self.raw_block_node = raw_block_node
-        self.tangle_root = tangle_root
-
-        super().__init__(*args)
-
-class LiterateHighlighter:
-    """
-    A custom code block highlighter that uses an existing highlighter and
-    insert custom links for references to other code blocks
-    """
-    def __init__(self, original_highlighter, node, ref_factory):
-        self._original_highlighter = original_highlighter
-        self.node = node
-        self.ref_factory = ref_factory
-
-    def highlight_block(self, rawsource, lang, **kwargs):
-        # Pre-process is done by the LiterateDirective
-
-        highlighted = self._original_highlighter.highlight_block(rawsource, lang, **kwargs)
-
-        # Post-process: Replace hashes with links
-        for hashcode, lit in self.node.hashcode_to_lit.items():
-            ref = self.ref_factory(self.node, lit)
-            highlighted = highlighted.replace(hashcode, ref)
-
-        return highlighted
-
-class LiterateNode(nodes.General, nodes.Element):
-    def __init__(self, literal_node, lit, *args):
-        """
-        We wrap a literal node and insert links to references code blocks
-        """
-        self._literal_node = literal_node
-        self.hashcode_to_block_key = {}
-        self.hashcode_to_lit = {}
-        self.lit = lit
-        super().__init__(*args)
-
-    @classmethod
-    def build_translation_handlers(cls, app):
-        """
-        This is a hack for inheriting the literal_block visitors so that we
-        support as many builders as possible.
-        (Feel free to suggest a better way...)
-        """
-        literal_block_handlers = {}
-        reference_handlers = {}
-        for name, builder in app.registry.builders.items():
-            default = builder.default_translator_class
-            translator_class = app.registry.translators.get(
-                name,
-                default.fget(app) if type(default) == property else default
-            )
-            if translator_class is None:
-                continue
-            literal_block_handlers[name] = (
-                translator_class.visit_literal_block,
-                translator_class.depart_literal_block
-            )
-            reference_handlers[name] = (
-                translator_class.visit_reference,
-                translator_class.depart_reference
-            )
-
-        inherited_html_visit, inherited_html_depart = literal_block_handlers.get('html', (None, None))
-
-        def create_ref(node, lit):
-            """
-            # TODO: Could this be a way to make that protable to all builders?
-            refnode = nodes.reference('', '')
-            refnode['refdocname'] = lit.docname
-            refnode['refuri'] = (
-                app.builder.get_relative_uri(node.document['source'], lit.docname)
-                + '#' + lit.target['refid']
-            )
-            refnode.append(nodes.Text(lit.name))
-            """
-            lit_id = lit.target['refid']
-            return (
-                app.config.lit_begin_ref +
-                f'<a href="#{lit_id}">{lit.name}</a>' +
-                app.config.lit_end_ref
-            )
-
-        def visit_html(self, node):
-            # Override highlighter
-            original_highlighter = self.highlighter
-            self.highlighter = LiterateHighlighter(original_highlighter, node, create_ref)
-
-            # Copy anchoring properties from wrapper node to internal node
-            node._literal_node['ids'] = node['ids']
-            node._literal_node['names'] = node['names']
-            for prop in ['expect_referenced_by_name', 'expect_referenced_by_id']:
-                if hasattr(node, prop):
-                    setattr(node._literal_node, prop, getattr(node, prop))
-
-            # Call inherited visitor
-            try:
-                inherited_html_visit(self, node._literal_node)
-                skip = False
-            except nodes.SkipNode:
-                skip = True
-            
-            # Restore highlighter
-            self.highlighter = original_highlighter
-
-            # Footer
-            self.body.append(
-                '<div class="lit-block-footer">' +
-                html.escape(app.config.lit_begin_ref) +
-                ' <span class="lit-name">' +
-                html.escape(node.lit.name) +
-                '</span> ' +
-                html.escape(app.config.lit_end_ref) +
-                '</div>'
-            )
-
-            if skip:
-                raise nodes.SkipNode
-
-        def depart_html(self, node):
-            inherited_html_depart(self, node._literal_node)
-
-        literal_block_handlers['html'] = (
-            visit_html,
-            depart_html,
-        )
-        return literal_block_handlers
-
-#############################################################
-# Directives
-
-class DirectiveMixin:
-    def parse_arguments(self):
-        self.arg_lexer = None
-        self.arg_name = ""
-
-        raw_args = self.arguments[0]
-        tokens = raw_args.split(",")
-        if len(tokens) == 1:
-            self.arg_name = tokens[0]
-        elif len(tokens) == 2:
-            self.arg_lexer = tokens[0].strip()
-            self.arg_name = tokens[1].strip()
-        else:
-            message = (
-                f"Invalid block name: '{raw_args}'\n" +
-                "At most 1 comma is allowed, to specify the language, but the name cannot contain a comma."
-            )
-            raise ExtensionError(message, modname="sphinx_literate")
-
-class TangleDirective(SphinxCodeBlock, DirectiveMixin):
-
-    required_arguments = 1
-    optional_arguments = 0
-    final_argument_whitespace = True
-
-    def run(self):
-        self.parse_arguments()
-
-        self.content = StringList(["Hello, world"])
-        self.arguments = [self.arg_lexer] if self.arg_lexer is not None else []
-
-        raw_block_node = super().run()[0]
-        tangle_root = self.env.temp_data.get('tangle-root')
-
-        return [
-            TangleNode(
-                self.arg_name,
-                self.arg_lexer,
-                self.env.docname,
-                self.lineno,
-                raw_block_node,
-                tangle_root
-            )
-        ]
-
-class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
-
-    has_content = True
-    required_arguments = 1
-    optional_arguments = 0
-    final_argument_whitespace = True
-
-    def run(self):
-        self.parse_arguments()
-        self.parsed_content = parse_block_content(self.content, self.config)
-        self.tangle_root = self.env.temp_data.get('tangle-root')
-
-        targetid = 'lit-%d' % self.env.new_serialno('lit')
-        targetnode = nodes.target('', '', ids=[targetid])
-
-        self.register_lit(targetnode)
-
-        # Call parent for generating a regular code block
-        self.content = StringList(self.parsed_content.content)
-        self.arguments = [self.arg_lexer] if self.arg_lexer is not None else []
-
-        raw_block_node = super().run()[0]
-
-        def postprocess_literal_node(raw_literal_node):
-            literate_node = LiterateNode(raw_literal_node, self.lit)
-            literate_node.hashcode_to_block_key = {
-                uid: CodeBlock.build_key(name, self.tangle_root)
-                for uid, name in self.parsed_content.uid_to_block_name.items()
-            }
-            return literate_node
-
-        if isinstance(raw_block_node, nodes.literal_block):
-            block_node = nodes.container(classes=['literal-block-wrapper'])
-            block_node += postprocess_literal_node(raw_block_node)
-        else:
-            new_children = []
-            for node in raw_block_node:
-                if isinstance(node, nodes.literal_block):
-                    node = postprocess_literal_node(node)
-                new_children.append(node)
-            block_node = raw_block_node
-            block_node.children = new_children
-
-        block_node['classes'].append("lit-block-wrapper")
-
-        return [targetnode, block_node]
-
-    def register_lit(self, targetnode):
-        self.lit = CodeBlock(
-            name=self.arg_name,
-            docname=self.env.docname,
-            lineno=self.lineno,
-            content=self.content,
-            target=targetnode,
-            lexer=self.arg_lexer,
-            tangle_root=self.tangle_root,
-        )
-
-        lit_codeblocks = CodeBlockRegistry.from_env(self.env)
-        lit_codeblocks.add_codeblock(self.lit)
+####################################################
 
 def purge_lit_codeblocks(app, env, docname):
     lit_codeblocks = CodeBlockRegistry.from_env(env)
@@ -383,11 +139,8 @@ def process_literate_nodes(app, doctree, fromdocname):
 def setup(app):
     setup_config(app)
 
-    app.add_node(TangleNode)
-    app.add_node(LiterateNode, **LiterateNode.build_translation_handlers(app))
+    setup_nodes(app)
 
-    app.add_directive("tangle", TangleDirective)
-    app.add_directive("lit", LiterateDirective)
     setup_directives(app)
 
     app.connect('doctree-resolved', process_literate_nodes)

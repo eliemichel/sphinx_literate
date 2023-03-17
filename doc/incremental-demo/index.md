@@ -52,3 +52,9 @@ else()
 	target_compile_options(App PRIVATE -Wall -Wextra -pedantic)
 endif()
 ```
+
+Tangled
+-------
+
+```{tangle} file: CMakeLists.txt
+```

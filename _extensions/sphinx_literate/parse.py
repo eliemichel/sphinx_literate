@@ -2,6 +2,8 @@ from typing import List, Dict
 from dataclasses import dataclass
 import random
 
+from .registry import CodeBlock
+
 #############################################################
 # Parse Backend
 
@@ -20,7 +22,7 @@ class ParsedBlockContent:
 
     # Holds the mapping from the uids and the original references to other
     # literate code blocks.
-    uid_to_block_name: Dict[Uid,str]
+    uid_to_block_key: Dict[Uid,str]
 
 #############################################################
 
@@ -29,7 +31,7 @@ def generate_uid() -> Uid:
 
 #############################################################
 
-def parse_block_content(content: List[str], config) -> ParsedBlockContent:
+def parse_block_content(content: List[str], tangle_root: str | None, config) -> ParsedBlockContent:
     """
     This reads the raw source code and extracts {{references}} to other blocks,
     not to disturb the syntax highlighter.
@@ -37,11 +39,13 @@ def parse_block_content(content: List[str], config) -> ParsedBlockContent:
     @note At this stage we do not check whether block names exist.
 
     @param original source code with literate references
+    @param tangle_root context of the block
+    @param config sphinx config
     @return a parsed block object
     """
     parsed = ParsedBlockContent(
         content = [],
-        uid_to_block_name = {},
+        uid_to_block_key = {},
     )
 
     raw_source = '\n'.join(content)
@@ -61,7 +65,7 @@ def parse_block_content(content: List[str], config) -> ParsedBlockContent:
             break
         uid = generate_uid()
         block_name = raw_source[begin_offset+len(begin_ref):end_offset]
-        parsed.uid_to_block_name[uid] = block_name
+        parsed.uid_to_block_key[uid] = CodeBlock.build_key(block_name, tangle_root)
         parsed_source += raw_source[offset:begin_offset]
         parsed_source += uid
         offset = end_offset + len(end_ref)
