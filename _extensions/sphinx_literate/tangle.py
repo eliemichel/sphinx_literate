@@ -1,37 +1,38 @@
 from typing import List
 
-from .registry import CodeBlockRegistry
+from .registry import CodeBlock, CodeBlockRegistry
 
 #############################################################
 # Private
 
 def _tangle_rec(
-    lit_content: List[str],
+    lit: CodeBlock,
     registry: CodeBlockRegistry,
     begin_ref: str, # config
     end_ref: str, # config
     tangled_content, # return list
     prefix="" # for recursive use only
 ) -> None:
-    for line in lit_content:
+    for line in lit.content:
         subprefix = None
-        key = None
+        name = None
         begin_offset = line.find(begin_ref)
         if begin_offset != -1:
             end_offset = line.find(end_ref, begin_offset)
             if end_offset != -1:
                 subprefix = line[:begin_offset]
-                key = line[begin_offset+len(begin_ref):end_offset]
-        if key is not None:
-            sublit = registry.get(key)
-            if sublit is None:
+                name = line[begin_offset+len(begin_ref):end_offset]
+        if name is not None:
+            sublit = registry.get(name, lit.tangle_root)
+            if lit is None:
                 message = (
-                    f"Literate code block not found: '{key}' " +
-                    f"(in tangle directive from document {node.docname}, line {node.lineno})"
+                    f"Literate code block not found: '{name}' " +
+                    f"(in tangle directive from document {lit.docname}, " +
+                    f"line {lit.lineno}, tangle root {lit.tangle_root})"
                 )
                 raise ExtensionError(message, modname="sphinx_literate")
             _tangle_rec(
-                sublit.content,
+                sublit,
                 registry,
                 begin_ref,
                 end_ref,
@@ -45,13 +46,22 @@ def _tangle_rec(
 # Public
 
 def tangle(
-    lit_block_key: str,
+    block_name: str,
+    tangle_root: str | None,
     lit_codeblocks: CodeBlockRegistry,
     config # sphinx app config
 ) -> List[str]:
+    lit = lit_codeblocks.get(block_name, tangle_root)
+    if lit is None:
+        message = (
+            f"Literate code block not found: '{block_name}' " +
+            f"(tangle root {tangle_root})"
+        )
+        raise ExtensionError(message, modname="sphinx_literate")
+
     tangled_content = []
     _tangle_rec(
-        lit_codeblocks.get(lit_block_key).content,
+        lit,
         lit_codeblocks,
         config.lit_begin_ref,
         config.lit_end_ref,

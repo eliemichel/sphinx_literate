@@ -45,3 +45,18 @@ provided as a first token separated from the block name by a comma (,).
 When the block name starts with "file:", the block is considered as the root
 and the remaining of the name is the path of the file into which the tangled
 content must be saved, relative to the root tangle directory.
+
+Setup
+-----
+
+The `lit-setup` directive can be used to setup local options.
+
+ - **tangle-root** The same sphinx documentation can tangle multiple source trees. This sets the root of all files defined later in the file. Two literate blocks defined in different roots can have the same name.
+
+For instance:
+
+````
+```{lit-setup}
+:tangle-root: incremental-demo
+```
+````

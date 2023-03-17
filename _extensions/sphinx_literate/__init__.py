@@ -63,17 +63,19 @@ import os
 from .builder import TangleBuilder
 from .registry import CodeBlock, CodeBlockRegistry
 from .tangle import tangle
+from .directives import setup as setup_directives
 
 #############################################################
 # Elements
 
 class TangleNode(nodes.General, nodes.Element):
-    def __init__(self, root_block_name, lexer, docname, lineno, raw_block_node, *args):
+    def __init__(self, root_block_name, lexer, docname, lineno, raw_block_node, tangle_root, *args):
         self.lexer = lexer
         self.root_block_name = root_block_name
         self.docname = docname
         self.lineno = lineno
         self.raw_block_node = raw_block_node
+        self.tangle_root = tangle_root
 
         super().__init__(*args)
 
@@ -105,7 +107,7 @@ class LiterateNode(nodes.General, nodes.Element):
         We wrap a literal node and insert links to references code blocks
         """
         self._literal_node = literal_node
-        self.hashcode_to_blockname = {}
+        self.hashcode_to_block_key = {}
         self.hashcode_to_lit = {}
         self.lit = lit
         super().__init__(*args)
@@ -236,6 +238,7 @@ class TangleDirective(SphinxCodeBlock, DirectiveMixin):
         self.arguments = [self.arg_lexer] if self.arg_lexer is not None else []
 
         raw_block_node = super().run()[0]
+        tangle_root = self.env.temp_data.get('tangle-root')
 
         return [
             TangleNode(
@@ -243,7 +246,8 @@ class TangleDirective(SphinxCodeBlock, DirectiveMixin):
                 self.arg_lexer,
                 self.env.docname,
                 self.lineno,
-                raw_block_node
+                raw_block_node,
+                tangle_root
             )
         ]
 
@@ -257,6 +261,7 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
     def run(self):
         self.parse_arguments()
         self.parse_content()
+        self.tangle_root = self.env.temp_data.get('tangle-root')
 
         targetid = 'lit-%d' % self.env.new_serialno('lit')
         targetnode = nodes.target('', '', ids=[targetid])
@@ -271,7 +276,10 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
 
         def postprocess_literal_node(raw_literal_node):
             literate_node = LiterateNode(raw_literal_node, self.lit)
-            literate_node.hashcode_to_blockname = self.hashcode_to_blockname
+            literate_node.hashcode_to_blockname = {
+                CodeBlock.build_key(name, self.tangle_root)
+                for k, name in self.hashcode_to_blockname.items()
+            }
             return literate_node
 
         if isinstance(raw_block_node, nodes.literal_block):
@@ -298,6 +306,7 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
             content=self.content,
             target=targetnode,
             lexer=self.arg_lexer,
+            tangle_root=self.tangle_root,
         )
 
         lit_codeblocks = CodeBlockRegistry.from_env(self.env)
@@ -347,8 +356,8 @@ def process_literate_nodes(app, doctree, fromdocname):
 
     for literate_node in doctree.findall(LiterateNode):
         literate_node.hashcode_to_lit = {
-            h: lit_codeblocks.get(blockname)
-            for h, blockname in literate_node.hashcode_to_blockname.items()
+            h: lit_codeblocks.get_by_key(key)
+            for h, key in literate_node.hashcode_to_block_key.items()
         }
 
     for tangle_node in doctree.findall(TangleNode):
@@ -376,6 +385,7 @@ def process_literate_nodes(app, doctree, fromdocname):
 
         tangled_content = tangle(
             tangle_node.root_block_name,
+            tangle_node.tangle_root,
             lit_codeblocks,
             app.config,
         )
@@ -406,6 +416,7 @@ def setup(app):
 
     app.add_directive("tangle", TangleDirective)
     app.add_directive("lit", LiterateDirective)
+    setup_directives(app)
 
     app.connect('doctree-resolved', process_literate_nodes)
     app.connect('env-purge-doc', purge_lit_codeblocks)

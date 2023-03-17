@@ -1,6 +1,8 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from typing import Any
+from dataclasses import dataclass
+
+from sphinx.errors import ExtensionError
 
 #############################################################
 # Codeblock
@@ -12,16 +14,30 @@ class CodeBlock:
     assembled when tangling.
     """
     name: str = ""
+
     docname: str = ""
+
+    # tangle_root as defined by lit-setup at the time the block was created
+    tangle_root: str | None = ""
+
     lineno: int = -1
+
     content: str = ""
+
+    # target anchor for referencing this code block in internal links
     target: Any = None
+
     lexer: str | None = None
 
     @property
     def key(self):
-        # TODO: Add config option to scope blocks per document
-        return self.name
+        return self.build_key(self.name, self.tangle_root)
+
+    @classmethod
+    def build_key(cls, name, tangle_root=None):
+        if tangle_root is None:
+            tangle_root = ""
+        return tangle_root + "##" + name
 
 #############################################################
 # Codeblock registry
@@ -42,6 +58,13 @@ class CodeBlockRegistry:
         self._blocks = {}
 
     def add_codeblock(self, lit: CodeBlock) -> None:
+        if "##" in lit.name:
+            message = (
+                f"The sequence '##' is not allowed in a block name, " +
+                f"it is reserved to internal mechanisms.\n"
+            )
+            raise ExtensionError(message, modname="sphinx_literate")
+
         key = lit.key
         existing = self._blocks.get(key)
         if existing is not None:
@@ -63,8 +86,11 @@ class CodeBlockRegistry:
     def blocks(self) -> CodeBlock:
         return self._blocks.values()
 
-    def get(self, key: str) -> CodeBlock:
+    def get_by_key(self, key: str) -> CodeBlock:
         return self._blocks.get(key)
+
+    def get(self, name: str, tangle_root: str | None = None) -> CodeBlock:
+        return self.get_by_key(CodeBlock.build_key(name, tangle_root))
 
     def keys(self, key: str) -> dict_keys:
         return self._blocks.keys()

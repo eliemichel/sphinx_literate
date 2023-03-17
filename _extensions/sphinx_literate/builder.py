@@ -61,8 +61,10 @@ class TangleBuilder(Builder):
         lit_codeblocks = CodeBlockRegistry.from_env(self.env)
         assert(lit.name.startswith("file:"))
         filename = lit.name[len("file:"):].strip()
+        if lit.tangle_root is not None:
+            filename = path.join(lit.tangle_root, filename)
 
-        tangled_content = tangle(lit.key, lit_codeblocks, self.app.config)
+        tangled_content = tangle(lit.name, lit.tangle_root, lit_codeblocks, self.app.config)
         print("===========")
         print('\n'.join(tangled_content))
 
