@@ -53,9 +53,6 @@ class LiterateNode(nodes.General, nodes.Element):
         self.uid_to_lit = {}
         self.lit = lit
         self.references: List[CodeBlock] = []
-
-        # Another block that completes this one
-        self.next_lit = None
         super().__init__(*args)
 
     @classmethod
@@ -126,32 +123,51 @@ class LiterateNode(nodes.General, nodes.Element):
             # Restore highlighter
             self.highlighter = original_highlighter
 
+            def make_link(lit, class_name=None):
+                refid = lit.target['refid']
+
+                name = lit.name
+                if lit.next is not None or lit.prev is not None:
+                    name += f'#{lit.child_index}'
+
+                if class_name is not None:
+                    begin_span = f'<span class="{class_name}">'
+                    end_span = '</span>'
+                else:
+                    begin_span = end_span = ""
+
+                return (
+                    html.escape(app.config.lit_begin_ref) +
+                    f'&nbsp;<a href="#{refid}">' +
+                        begin_span +
+                            html.escape(name) +
+                        end_span +
+                    '</a>&nbsp;' +
+                    html.escape(app.config.lit_end_ref)
+                )
+
+            parent_link = ''
+            if node.lit.prev is not None:
+                parent_link = ' completing ' + make_link(node.lit.prev)
+
+            child_link = ''
+            if node.lit.next is not None:
+                child_link = ' completed in ' + make_link(node.lit.next)
+
             ref_links = ''
             if node.references:
                 ref_links = ' referenced in '
                 for ref in node.references:
-                    lit_id = ref.target['refid']
-                    ref_links += (
-                        html.escape(app.config.lit_begin_ref) +
-                        f' <a href="#{lit_id}">{html.escape(ref.name)}</a> ' +
-                        html.escape(app.config.lit_end_ref)
-                    )
-
-            child_links = ''
-            if node.next_lit is not None:
-                child_links = ' completed in '
+                    ref_links += make_link(ref)
 
             # Footer
             lit_id = node.lit.target['refid']
             self.body.append(
                 '<div class="lit-block-footer">' +
-                html.escape(app.config.lit_begin_ref) +
-                f' <a href="#{lit_id}"><span class="lit-name">' +
-                html.escape(node.lit.name) +
-                '</span></a> ' +
-                html.escape(app.config.lit_end_ref) +
-                child_links +
-                ref_links +
+                    make_link(node.lit, class_name="lit-name") +
+                    parent_link +
+                    child_link +
+                    ref_links +
                 '</div>'
             )
 

@@ -90,10 +90,6 @@ def process_literate_nodes(app, doctree, fromdocname):
             lit_codeblocks.get_by_key(k)
             for k in lit_codeblocks.references_to_key(literate_node.lit.key)
         ]
-        if node.lit.children:
-            literate_node.next_lit = node.lit.children[0]
-        elif node.lit.is_child:
-            parent = node.lit.parent
 
     for tangle_node in doctree.findall(TangleNode):
         lit = lit_codeblocks.get(tangle_node.root_block_name)

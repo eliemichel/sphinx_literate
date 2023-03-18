@@ -40,13 +40,12 @@ class CodeBlock:
     # NB: Fields bellow are handled by the registry
 
     # A block has children when it gets appended some content in later blocks
-    children: List[CodeBlock] = field(default_factory=list)
+    # (this is a basic doubly linked list)
+    next: CodeBlock | None = None
+    prev: CodeBlock | None = None
 
-    # True iff the block is a child of another one
-    # NB: to get the parent, just use self.key to get it from the registry
-    # since the parent has the same key. There is only one level of children
-    # (i.e., no grand children).
-    is_child: bool = False
+    # The index of the block in the child list
+    child_index: int = 0
 
     @property
     def key(self) -> Key:
@@ -64,8 +63,8 @@ class CodeBlock:
         """
         for l in self.content:
             yield l
-        for c in self.children:
-            for l in c.all_content():
+        if self.next is not None:
+            for l in self.next.all_content():
                 yield l
 
 #############################################################
@@ -119,8 +118,19 @@ class CodeBlockRegistry:
                     f"Trying to append to a non existing literate code blocks '{lit.name}'{maybe_root}"
                 )
                 raise ExtensionError(message, modname="sphinx_literate")
-            lit.is_child = True
-            existing.children.append(lit)
+
+            # Insert at the end of the child list
+            while existing.next is not None:
+                existing = existing.next
+            existing.next = lit
+            lit.prev = existing
+
+            # Update child index for 'lit' and its children
+            child_index = existing.child_index + 1
+            while lit is not None:
+                lit.child_index = child_index
+                child_index += 1
+                lit = lit.next
         else:
             if existing is not None:
                 message = (
