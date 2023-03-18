@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Any, Dict, Set
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import defaultdict
 
 from sphinx.errors import ExtensionError
@@ -16,21 +16,37 @@ class CodeBlock:
     Data store about a code block parsed from a {lit} directive, to be
     assembled when tangling.
     """
+
+    # Name of the code block (see title parsing)
     name: str = ""
 
+    # Source document where the block was defined
     docname: str = ""
 
-    # tangle_root as defined by lit-setup at the time the block was created
+    # Tangle root as defined by lit-setup at the time the block was created
     tangle_root: str | None = ""
 
+    # Line number at which the code block was defined in the source document
     lineno: int = -1
 
-    content: str = ""
+    # A list of lines
+    content: List[str] = field(default_factory=list)
 
-    # target anchor for referencing this code block in internal links
+    # Target anchor for referencing this code block in internal links
     target: Any = None
 
     lexer: str | None = None
+
+    # NB: Fields bellow are handled by the registry
+
+    # A block has children when it gets appended some content in later blocks
+    children: List[CodeBlock] = field(default_factory=list)
+
+    # True iff the block is a child of another one
+    # NB: to get the parent, just use self.key to get it from the registry
+    # since the parent has the same key. There is only one level of children
+    # (i.e., no grand children).
+    is_child: bool = False
 
     @property
     def key(self) -> Key:
@@ -41,6 +57,16 @@ class CodeBlock:
         if tangle_root is None:
             tangle_root = ""
         return tangle_root + "##" + name
+
+    def all_content(self):
+        """
+        Iterate on all lines of content, including children
+        """
+        for l in self.content:
+            yield l
+        for c in self.children:
+            for l in c.all_content():
+                yield l
 
 #############################################################
 # Codeblock registry
@@ -63,11 +89,14 @@ class CodeBlockRegistry:
         # self._references[key] lists all blocks that reference key
         self._references: Dict[Key,Set[Key]] = defaultdict(set)
 
-    def add_codeblock(self, lit: CodeBlock) -> None:
+    def add_codeblock(self, lit: CodeBlock, append: bool = False) -> None:
         """
         Add a new code block to the repository. If a block already exists with
         the same key, an error is raised.
         @param lit block to add
+        @param append if true, the content of the code block is added to the
+                      code block that already has the same name. Raises an
+                      exception if such a block does not exist.
         """
         if "##" in lit.name:
             message = (
@@ -78,14 +107,29 @@ class CodeBlockRegistry:
 
         key = lit.key
         existing = self._blocks.get(key)
-        if existing is not None:
-            message = (
-                f"Multiple literate code blocks with the same name '{key}' were found:\n" +
-                f"  - In document '{existing.docname}', line {existing.lineno}.\n"
-                f"  - In document '{lit.docname}', line {lit.lineno}.\n"
-            )
-            raise ExtensionError(message, modname="sphinx_literate")
-        self._blocks[key] = lit
+
+        # For error message
+        maybe_root = ''
+        if lit.tangle_root is not None:
+            maybe_root = f" (in root '{lit.tangle_root}')"
+
+        if append:
+            if existing is None:
+                message = (
+                    f"Trying to append to a non existing literate code blocks '{lit.name}'{maybe_root}"
+                )
+                raise ExtensionError(message, modname="sphinx_literate")
+            lit.is_child = True
+            existing.children.append(lit)
+        else:
+            if existing is not None:
+                message = (
+                    f"Multiple literate code blocks with the same name '{lit.name}'{maybe_root} were found:\n" +
+                    f"  - In document '{existing.docname}', line {existing.lineno}.\n"
+                    f"  - In document '{lit.docname}', line {lit.lineno}.\n"
+                )
+                raise ExtensionError(message, modname="sphinx_literate")
+            self._blocks[key] = lit
 
     def add_reference(self, referencer: Key, referencee: Key) -> None:
         """

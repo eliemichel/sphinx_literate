@@ -1,11 +1,78 @@
-from typing import List, Dict
-from dataclasses import dataclass
+from typing import List, Dict, Set
+from dataclasses import dataclass, field
 import random
+import re
 
 from .registry import CodeBlock
 
+from sphinx.errors import ExtensionError
+
 #############################################################
-# Parse Backend
+# Block Title
+
+@dataclass
+class ParsedBlockTitle:
+    """
+    The raw title of a lit block looks like:
+
+        {lit} Language, The title (some options)
+
+    The title must not contain comma nor parenthesis.
+    The language and options are optional.
+
+    Note that we do not used Sphinx default mechanism for options in order to
+    keep it more literate (closer to what a human would spontaneously write).
+    """
+
+    # Name of the block, used to reference it
+    name: str = ""
+
+    # Name of the language lexer
+    lexer: str | None = None
+
+    # Possible options are 'APPEND'
+    options: Set[str] = field(default_factory=list)
+
+#############################################################
+
+def parse_block_title(raw_title: str) -> ParsedBlockTitle:
+    """
+    This parse a literate code block title (@see ParsedBlockTitle)
+    @param raw_title title as returned by Directive.arguments[0]
+    @return a parsed title object
+    """
+    m = re.match(r"((?P<lexer>[^(,]*),)?(?P<name>[^(,]*)(?P<options>\(.*\))?", raw_title)
+
+    if m is None:
+        message = (
+            f"Invalid block name: '{raw_title}'" +
+            "note: At most 1 comma is allowed, to specify the language, but the name cannot contain a comma."
+        )
+        raise ExtensionError(message, modname="sphinx_literate")
+
+    name = m.group("name").strip()
+
+    lexer = m.group("lexer")
+    if lexer is not None:
+        lexer = lexer.strip()
+
+    options = m.group("options")
+    if options is None:
+        options = set()
+    else:
+        options = {
+            opt.strip().upper()
+            for opt in options[1:-1].split(',')
+        }
+
+    return ParsedBlockTitle(
+        name = name,
+        lexer = lexer,
+        options = options,
+    )
+
+#############################################################
+# Block Content
 
 Uid = str
 
@@ -17,7 +84,7 @@ class ParsedBlockContent:
     highlight is added.
     """
 
-    # Content of teh block where references are replaced with uids
+    # Content of the block where references are replaced with uids
     content: List[str]
 
     # Holds the mapping from the uids and the original references to other
@@ -38,7 +105,7 @@ def parse_block_content(content: List[str], tangle_root: str | None, config) -> 
 
     @note At this stage we do not check whether block names exist.
 
-    @param original source code with literate references
+    @param content original source code with literate references
     @param tangle_root context of the block
     @param config sphinx config
     @return a parsed block object

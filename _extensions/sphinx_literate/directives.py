@@ -10,30 +10,9 @@ from sphinx.util.typing import OptionSpec
 from sphinx.directives.code import CodeBlock as SphinxCodeBlock
 from sphinx.application import Sphinx
 
-from .parse import parse_block_content
+from .parse import parse_block_content, parse_block_title
 from .registry import CodeBlock, CodeBlockRegistry
 from .nodes import LiterateNode, TangleNode
-
-#############################################################
-
-class DirectiveMixin:
-    def parse_arguments(self):
-        self.arg_lexer = None
-        self.arg_name = ""
-
-        raw_args = self.arguments[0]
-        tokens = raw_args.split(",")
-        if len(tokens) == 1:
-            self.arg_name = tokens[0]
-        elif len(tokens) == 2:
-            self.arg_lexer = tokens[0].strip()
-            self.arg_name = tokens[1].strip()
-        else:
-            message = (
-                f"Invalid block name: '{raw_args}'\n" +
-                "At most 1 comma is allowed, to specify the language, but the name cannot contain a comma."
-            )
-            raise ExtensionError(message, modname="sphinx_literate")
 
 #############################################################
 
@@ -61,25 +40,25 @@ class LiterateSetupDirective(SphinxDirective):
 
 #############################################################
 
-class TangleDirective(SphinxCodeBlock, DirectiveMixin):
+class TangleDirective(SphinxCodeBlock):
 
     required_arguments = 1
     optional_arguments = 0
     final_argument_whitespace = True
 
     def run(self):
-        self.parse_arguments()
+        parsed_title = parse_block_title(self.arguments[0])
+        tangle_root = self.env.temp_data.get('tangle-root')
 
         self.content = StringList(["Hello, world"])
-        self.arguments = [self.arg_lexer] if self.arg_lexer is not None else []
+        self.arguments = [parsed_title.lexer] if parsed_title.lexer is not None else []
 
         raw_block_node = super().run()[0]
-        tangle_root = self.env.temp_data.get('tangle-root')
 
         return [
             TangleNode(
-                self.arg_name,
-                self.arg_lexer,
+                parsed_title.name,
+                parsed_title.lexer,
                 self.env.docname,
                 self.lineno,
                 raw_block_node,
@@ -89,7 +68,7 @@ class TangleDirective(SphinxCodeBlock, DirectiveMixin):
 
 #############################################################
 
-class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
+class LiterateDirective(SphinxCodeBlock):
 
     has_content = True
     required_arguments = 1
@@ -97,31 +76,31 @@ class LiterateDirective(SphinxCodeBlock, DirectiveMixin):
     final_argument_whitespace = True
 
     def run(self):
-        self.parse_arguments()
         tangle_root = self.env.temp_data.get('tangle-root')
+        parsed_title = parse_block_title(self.arguments[0])
         self.parsed_content = parse_block_content(self.content, tangle_root, self.config)
 
         targetid = 'lit-%d' % self.env.new_serialno('lit')
         targetnode = nodes.target('', '', ids=[targetid])
 
         self.lit = CodeBlock(
-            name=self.arg_name,
+            name=parsed_title.name,
             docname=self.env.docname,
             lineno=self.lineno,
             content=self.content,
             target=targetnode,
-            lexer=self.arg_lexer,
+            lexer=parsed_title.lexer,
             tangle_root=tangle_root,
         )
 
         lit_codeblocks = CodeBlockRegistry.from_env(self.env)
-        lit_codeblocks.add_codeblock(self.lit)
+        lit_codeblocks.add_codeblock(self.lit, append='APPEND' in parsed_title.options)
         for ref in self.parsed_content.uid_to_block_key.values():
             lit_codeblocks.add_reference(self.lit.key, ref)
 
         # Call parent for generating a regular code block
         self.content = StringList(self.parsed_content.content)
-        self.arguments = [self.arg_lexer] if self.arg_lexer is not None else []
+        self.arguments = [parsed_title.lexer] if parsed_title.lexer is not None else []
 
         block_node = self.create_block_node()
 

@@ -13,7 +13,7 @@ def _tangle_rec(
     tangled_content, # return list
     prefix="" # for recursive use only
 ) -> None:
-    for line in lit.content:
+    for line in lit.all_content():
         subprefix = None
         name = None
         begin_offset = line.find(begin_ref)

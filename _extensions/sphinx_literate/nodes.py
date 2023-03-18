@@ -53,6 +53,9 @@ class LiterateNode(nodes.General, nodes.Element):
         self.uid_to_lit = {}
         self.lit = lit
         self.references: List[CodeBlock] = []
+
+        # Another block that completes this one
+        self.next_lit = None
         super().__init__(*args)
 
     @classmethod
@@ -134,6 +137,10 @@ class LiterateNode(nodes.General, nodes.Element):
                         html.escape(app.config.lit_end_ref)
                     )
 
+            child_links = ''
+            if node.next_lit is not None:
+                child_links = ' completed in '
+
             # Footer
             lit_id = node.lit.target['refid']
             self.body.append(
@@ -143,6 +150,7 @@ class LiterateNode(nodes.General, nodes.Element):
                 html.escape(node.lit.name) +
                 '</span></a> ' +
                 html.escape(app.config.lit_end_ref) +
+                child_links +
                 ref_links +
                 '</div>'
             )
