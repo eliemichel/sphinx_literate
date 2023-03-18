@@ -38,5 +38,24 @@ class TestBlockTitle(TestCase):
 		self.assertEqual(parsed_title.name, "Hello world")
 		self.assertEqual(parsed_title.options, {'AGAIN'})
 
+class TestLitConfig(TestCase):
+	def test_parser(self):
+		"""
+		Check that it is not possible to define multiple parents for the same
+		tangle root.
+		"""
+		source = """
+		```{lit-config}
+		:tangle-root: foo
+		:parent: bar
+		```
+
+		```{lit-config}
+		:tangle-root: foo
+		:parent: baz
+		```
+		"""
+		# TODO: process this source and check that it leads to an exception
+
 if __name__ == "__main__":
 	main()

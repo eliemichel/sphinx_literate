@@ -68,6 +68,19 @@ class CodeBlock:
                 yield l
 
 #############################################################
+
+@dataclass
+class TangleHierarchyEntry:
+    """
+    Store options for each tangle root about the first lit-setup directive that
+    defiend its parent.
+    """
+    root: str
+    parent: str
+    docname: str
+    lineno: int
+
+#############################################################
 # Codeblock registry
 
 class CodeBlockRegistry:
@@ -83,10 +96,18 @@ class CodeBlockRegistry:
         return env.lit_codeblocks
 
     def __init__(self) -> None:
+        # Literate code blocks that have been define, indexed by their key.
+        # If blocks with the same key have been appended, they are accessed
+        # using the `next` member of CodeBlock.
         self._blocks: Dict[Key,CodeBlock] = {}
+
         # Store an index of all the references to a block
         # self._references[key] lists all blocks that reference key
         self._references: Dict[Key,Set[Key]] = defaultdict(set)
+
+        # Holds the relationship between different tangle roots.
+        # This maps a root to its parent
+        self._hierarchy: Dict[str,TangleHierarchyEntry] = {}
 
     def add_codeblock(self, lit: CodeBlock) -> None:
         """
@@ -114,7 +135,7 @@ class CodeBlockRegistry:
                 f"  - In document '{lit.docname}', line {lit.lineno}.\n"
             )
             raise ExtensionError(message, modname="sphinx_literate")
-            
+
         self._blocks[key] = lit
 
     def append_codeblock(self, lit: CodeBlock) -> None:
@@ -175,17 +196,47 @@ class CodeBlockRegistry:
         self._references[referencee].add(referencer)
 
     def merge(self, other: CodeBlockRegistry) -> None:
+        """
+        Merge antoher registry into this one.
+        """
         for lit in other.blocks():
             self.add_codeblock(lit, refs)
         for key, refs in other._references.items():
             self._references[key].update(refs)
 
     def remove_codeblocks_by_docname(self, docname: str) -> None:
+        # TODO: when supporting cross-document REPLACE, be careful here
         self._blocks = {
             key: lit
             for key, lit in self._blocks.items()
             if lit.docname != docname
         }
+
+    def set_tangle_parent(self, tangle_root: str, parent: str, docname: str, lineno: int) -> None:
+        """
+        Set the parent for a given tangle root. Fail if a different root has
+        already been defined.
+        @param tangle_root name of the tangle root for which we define a parent
+        @param parent name of the tangle to set as parent
+        @param docname Name of the document that sets this parenting
+        @param lineno Line where the lit-config that sets this is defined
+        """
+        existing = self._hierarchy.get(tangle_root)
+        if existing is not None:
+            if existing.parent != parent:
+                message = (
+                    f"Attempting to set the tangle parent for root '{tangle_root}' to a different value:\n" +
+                    f"  Was set to '{existing.parent}' in document '{existing.docname}', line {existing.lineno}.\n"
+                    f"  But trying to set to '{parent}' in document '{docname}', line {lineno}.\n"
+                )
+                raise ExtensionError(message, modname="sphinx_literate")
+        else:
+            self._hierarchy[tangle_root] = TangleHierarchyEntry(
+                root = tangle_root,
+                parent = parent,
+                docname = docname,
+                lineno = lineno
+            )
 
     def blocks(self) -> CodeBlock:
         return self._blocks.values()

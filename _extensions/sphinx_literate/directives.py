@@ -36,9 +36,21 @@ class LiterateSetupDirective(SphinxDirective):
         tangle_root = self.options.get('tangle-root')
         tangle_parent = self.options.get('parent')
         force = 'force' in self.options
+        reg = CodeBlockRegistry.from_env(self.env)
 
-        self.env.temp_data['tangle-root'] = tangle_root
-        self.env.temp_data['tangle-parent'] = tangle_parent
+        if tangle_root is not None:
+            self.env.temp_data['tangle-root'] = tangle_root
+        else:
+            tangle_root = self.env.temp_data['tangle-root']
+
+        if tangle_parent is not None:
+            reg.set_tangle_parent(
+                tangle_root,
+                tangle_parent,
+                self.env.docname,
+                self.lineno,
+            )
+
         return []
 
 #############################################################
