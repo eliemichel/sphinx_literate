@@ -97,7 +97,13 @@ class LiterateDirective(SphinxCodeBlock):
         )
 
         lit_codeblocks = CodeBlockRegistry.from_env(self.env)
-        lit_codeblocks.add_codeblock(self.lit, append='APPEND' in parsed_title.options)
+        if 'APPEND' in parsed_title.options:
+            lit_codeblocks.append_codeblock(self.lit)
+        elif 'REPLACE' in parsed_title.options:
+            lit_codeblocks.replace_codeblock(self.lit)
+        else:
+            lit_codeblocks.add_codeblock(self.lit)
+
         for ref in self.parsed_content.uid_to_block_key.values():
             lit_codeblocks.add_reference(self.lit.key, ref)
 

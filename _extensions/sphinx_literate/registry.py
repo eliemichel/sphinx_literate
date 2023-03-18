@@ -88,14 +88,11 @@ class CodeBlockRegistry:
         # self._references[key] lists all blocks that reference key
         self._references: Dict[Key,Set[Key]] = defaultdict(set)
 
-    def add_codeblock(self, lit: CodeBlock, append: bool = False) -> None:
+    def add_codeblock(self, lit: CodeBlock) -> None:
         """
         Add a new code block to the repository. If a block already exists with
         the same key, an error is raised.
         @param lit block to add
-        @param append if true, the content of the code block is added to the
-                      code block that already has the same name. Raises an
-                      exception if such a block does not exist.
         """
         if "##" in lit.name:
             message = (
@@ -107,39 +104,69 @@ class CodeBlockRegistry:
         key = lit.key
         existing = self._blocks.get(key)
 
-        # For error message
-        maybe_root = ''
-        if lit.tangle_root is not None:
-            maybe_root = f" (in root '{lit.tangle_root}')"
+        if existing is not None:
+            maybe_root = ''
+            if lit.tangle_root is not None:
+                maybe_root = f" (in root '{lit.tangle_root}')"
+            message = (
+                f"Multiple literate code blocks with the same name '{lit.name}'{maybe_root} were found:\n" +
+                f"  - In document '{existing.docname}', line {existing.lineno}.\n"
+                f"  - In document '{lit.docname}', line {lit.lineno}.\n"
+            )
+            raise ExtensionError(message, modname="sphinx_literate")
+            
+        self._blocks[key] = lit
 
-        if append:
-            if existing is None:
-                message = (
-                    f"Trying to append to a non existing literate code blocks '{lit.name}'{maybe_root}"
-                )
-                raise ExtensionError(message, modname="sphinx_literate")
+    def append_codeblock(self, lit: CodeBlock) -> None:
+        """
+        Append the content of the code block to the code block that already has
+        the same name. Raises an exception if such a block does not exist.
+        @param lit block to append
+        """
+        key = lit.key
+        existing = self._blocks.get(key)
 
-            # Insert at the end of the child list
-            while existing.next is not None:
-                existing = existing.next
-            existing.next = lit
-            lit.prev = existing
+        if existing is None:
+            maybe_root = ''
+            if lit.tangle_root is not None:
+                maybe_root = f" (in root '{lit.tangle_root}')"
+            message = (
+                f"Trying to append to a non existing literate code blocks '{lit.name}'{maybe_root}"
+            )
+            raise ExtensionError(message, modname="sphinx_literate")
 
-            # Update child index for 'lit' and its children
-            child_index = existing.child_index + 1
-            while lit is not None:
-                lit.child_index = child_index
-                child_index += 1
-                lit = lit.next
-        else:
-            if existing is not None:
-                message = (
-                    f"Multiple literate code blocks with the same name '{lit.name}'{maybe_root} were found:\n" +
-                    f"  - In document '{existing.docname}', line {existing.lineno}.\n"
-                    f"  - In document '{lit.docname}', line {lit.lineno}.\n"
-                )
-                raise ExtensionError(message, modname="sphinx_literate")
-            self._blocks[key] = lit
+        # Insert at the end of the child list
+        while existing.next is not None:
+            existing = existing.next
+        existing.next = lit
+        lit.prev = existing
+
+        # Update child index for 'lit' and its children
+        child_index = existing.child_index + 1
+        while lit is not None:
+            lit.child_index = child_index
+            child_index += 1
+            lit = lit.next
+
+    def replace_codeblock(self, lit: CodeBlock) -> None:
+        """
+        Replace a block and all this children with a new one. Raises an
+        exception if such a block does not exist.
+        @param lit block to append
+        """
+        key = lit.key
+        existing = self._blocks.get(key)
+
+        if existing is None:
+            maybe_root = ''
+            if lit.tangle_root is not None:
+                maybe_root = f" (in root '{lit.tangle_root}')"
+            message = (
+                f"Trying to replace a non existing literate code blocks '{lit.name}'{maybe_root}"
+            )
+            raise ExtensionError(message, modname="sphinx_literate")
+
+        self._blocks[key] = lit
 
     def add_reference(self, referencer: Key, referencee: Key) -> None:
         """

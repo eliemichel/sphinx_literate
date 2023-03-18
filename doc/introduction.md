@@ -46,12 +46,30 @@ When the block name starts with "file:", the block is considered as the root
 and the remaining of the name is the path of the file into which the tangled
 content must be saved, relative to the root tangle directory.
 
+Block title
+-----------
+
+The title of a literate block is structured as follows:
+
+```
+Language, The full title (some, option)
+```
+
+This means that the language parser is "Language", the reference name of the block is "The full title" and it has options 'SOME' and 'OPTION'. Valid options are:
+
+ - **APPEND** Add the content of this block to the previous blocks with the same name
+ - **REPLACE** Replace the content of this block
+
+Append and replace require that the block has already been defined, and only work within the same document for now.
+
 Local setup
 -----------
 
 The `lit-setup` directive can be used to setup local options.
 
  - **tangle-root** The same sphinx documentation can tangle multiple source trees. This sets the root of all files defined later in the file. Two literate blocks defined in different roots can have the same name.
+
+ - **parent** The tangle root from which this one inherits.
 
 For instance:
 
