@@ -28,14 +28,17 @@ class LiterateSetupDirective(SphinxDirective):
     option_spec: OptionSpec = {
         'force': directives.flag,
         'linenothreshold': directives.positive_int,
-        'tangle-root': directives.unchanged
+        'tangle-root': directives.unchanged,
+        'parent': directives.unchanged,
     }
 
     def run(self) -> List[Node]:
         tangle_root = self.options.get('tangle-root')
+        tangle_parent = self.options.get('parent')
         force = 'force' in self.options
 
         self.env.temp_data['tangle-root'] = tangle_root
+        self.env.temp_data['tangle-parent'] = tangle_parent
         return []
 
 #############################################################

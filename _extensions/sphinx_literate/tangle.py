@@ -2,6 +2,8 @@ from typing import List
 
 from .registry import CodeBlock, CodeBlockRegistry
 
+from sphinx.errors import ExtensionError
+
 #############################################################
 # Private
 
@@ -65,7 +67,7 @@ def tangle(
     if lit is None:
         message = (
             f"Literate code block not found: '{block_name}' " +
-            f"(tangle root {tangle_root})"
+            f"(in root '{tangle_root}')"
         )
         raise ExtensionError(message, modname="sphinx_literate")
 
