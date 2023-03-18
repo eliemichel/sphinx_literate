@@ -25,7 +25,7 @@ def _tangle_rec(
                 subprefix = line[:begin_offset]
                 name = line[begin_offset+len(begin_ref):end_offset]
         if name is not None:
-            sublit = registry.get(name, lit.tangle_root)
+            sublit = registry.get_rec(name, lit.tangle_root)
             if lit is None:
                 message = (
                     f"Literate code block not found: '{name}' " +
@@ -50,7 +50,7 @@ def _tangle_rec(
 def tangle(
     block_name: str,
     tangle_root: str | None,
-    lit_codeblocks: CodeBlockRegistry,
+    registry: CodeBlockRegistry,
     config # sphinx app config
 ) -> List[str]:
     """
@@ -59,11 +59,11 @@ def tangle(
     @param block_name the name of the block to tangle
     @param tangle_root the name of the root directory: two code blocks with the
            same name may exist only if they belong to different root directories.
-    @param lit_codeblocks the registry containing all the code blocks extracted
-           from the source documentation.
+    @param registry the registry containing all the code blocks extracted
+                    from the source documentation.
     @return the generated source code as a list of lines
     """
-    lit = lit_codeblocks.get(block_name, tangle_root)
+    lit = registry.get_rec(block_name, tangle_root)
     if lit is None:
         message = (
             f"Literate code block not found: '{block_name}' " +
@@ -74,7 +74,7 @@ def tangle(
     tangled_content = []
     _tangle_rec(
         lit,
-        lit_codeblocks,
+        registry,
         config.lit_begin_ref,
         config.lit_end_ref,
         tangled_content,

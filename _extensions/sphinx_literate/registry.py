@@ -175,8 +175,7 @@ class CodeBlockRegistry:
         exception if such a block does not exist.
         @param lit block to append
         """
-        key = lit.key
-        existing = self._blocks.get(key)
+        existing = self.get_rec(lit.name, lit.tangle_root)
 
         if existing is None:
             maybe_root = ''
@@ -187,7 +186,7 @@ class CodeBlockRegistry:
             )
             raise ExtensionError(message, modname="sphinx_literate")
 
-        self._blocks[key] = lit
+        self._blocks[lit.key] = lit
 
     def add_reference(self, referencer: Key, referencee: Key) -> None:
         """
@@ -246,6 +245,21 @@ class CodeBlockRegistry:
 
     def get(self, name: str, tangle_root: str | None = None) -> CodeBlock:
         return self.get_by_key(CodeBlock.build_key(name, tangle_root))
+
+    def get_rec(self, name: str, tangle_root: str | None = None) -> CodeBlock:
+        """
+        Get a block an drecursively search for it in parent tangles
+        """
+        existing = self.get(name, tangle_root)
+        if existing is not None:
+            return existing
+        hierarchy = self._hierarchy.get(tangle_root)
+        while hierarchy is not None:
+            existing = self.get(name, hierarchy.parent)
+            if existing is not None:
+                return existing
+            hierarchy = self._hierarchy.get(hierarchy.parent)
+        return None
 
     def keys(self, key: Key) -> dict_keys:
         return self._blocks.keys()
