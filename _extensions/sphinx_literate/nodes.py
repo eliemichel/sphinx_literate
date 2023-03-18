@@ -125,24 +125,25 @@ class LiterateNode(nodes.General, nodes.Element):
 
             ref_links = ''
             if node.references:
-                ref_links = ', referenced in '
+                ref_links = ' referenced in '
                 for ref in node.references:
                     lit_id = ref.target['refid']
                     ref_links += (
                         html.escape(app.config.lit_begin_ref) +
-                        f'<a href="#{lit_id}">{html.escape(ref.name)}</a>' +
+                        f' <a href="#{lit_id}">{html.escape(ref.name)}</a> ' +
                         html.escape(app.config.lit_end_ref)
                     )
 
             # Footer
+            lit_id = node.lit.target['refid']
             self.body.append(
                 '<div class="lit-block-footer">' +
                 html.escape(app.config.lit_begin_ref) +
-                ' <span class="lit-name">' +
+                f' <a href="#{lit_id}"><span class="lit-name">' +
                 html.escape(node.lit.name) +
-                '</span> ' +
-                ref_links +
+                '</span></a> ' +
                 html.escape(app.config.lit_end_ref) +
+                ref_links +
                 '</div>'
             )
 

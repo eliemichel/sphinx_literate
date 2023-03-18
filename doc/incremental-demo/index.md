@@ -56,5 +56,5 @@ endif()
 Tangled
 -------
 
-```{tangle} file: CMakeLists.txt
+```{tangle} CMake, file: CMakeLists.txt
 ```
