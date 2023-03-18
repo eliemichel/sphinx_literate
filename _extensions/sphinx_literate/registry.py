@@ -1,11 +1,14 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, Dict, Set
 from dataclasses import dataclass
+from collections import defaultdict
 
 from sphinx.errors import ExtensionError
 
 #############################################################
 # Codeblock
+
+Key = str
 
 @dataclass
 class CodeBlock:
@@ -30,11 +33,11 @@ class CodeBlock:
     lexer: str | None = None
 
     @property
-    def key(self):
+    def key(self) -> Key:
         return self.build_key(self.name, self.tangle_root)
 
     @classmethod
-    def build_key(cls, name, tangle_root=None):
+    def build_key(cls, name, tangle_root=None) -> Key:
         if tangle_root is None:
             tangle_root = ""
         return tangle_root + "##" + name
@@ -55,9 +58,17 @@ class CodeBlockRegistry:
         return env.lit_codeblocks
 
     def __init__(self) -> None:
-        self._blocks = {}
+        self._blocks: Dict[Key,CodeBlock] = {}
+        # Store an index of all the references to a block
+        # self._references[key] lists all blocks that reference key
+        self._references: Dict[Key,Set[Key]] = defaultdict(set)
 
     def add_codeblock(self, lit: CodeBlock) -> None:
+        """
+        Add a new code block to the repository. If a block already exists with
+        the same key, an error is raised.
+        @param lit block to add
+        """
         if "##" in lit.name:
             message = (
                 f"The sequence '##' is not allowed in a block name, " +
@@ -76,6 +87,18 @@ class CodeBlockRegistry:
             raise ExtensionError(message, modname="sphinx_literate")
         self._blocks[key] = lit
 
+    def add_reference(self, referencer: Key, referencee: Key) -> None:
+        """
+        Signal that `referencer` contains a reference to `referencee`
+        """
+        self._references[referencee].add(referencer)
+
+    def merge(self, other: CodeBlockRegistry) -> None:
+        for lit in other.blocks():
+            self.add_codeblock(lit, refs)
+        for key, refs in other._references.items():
+            self._references[key].update(refs)
+
     def remove_codeblocks_by_docname(self, docname: str) -> None:
         self._blocks = {
             key: lit
@@ -86,14 +109,17 @@ class CodeBlockRegistry:
     def blocks(self) -> CodeBlock:
         return self._blocks.values()
 
-    def get_by_key(self, key: str) -> CodeBlock:
+    def get_by_key(self, key: Key) -> CodeBlock:
         return self._blocks.get(key)
 
     def get(self, name: str, tangle_root: str | None = None) -> CodeBlock:
         return self.get_by_key(CodeBlock.build_key(name, tangle_root))
 
-    def keys(self, key: str) -> dict_keys:
+    def keys(self, key: Key) -> dict_keys:
         return self._blocks.keys()
 
     def items(self) -> dict_items:
         return self._blocks.items()
+
+    def references_to_key(self, key: Key) -> List[Key]:
+        return list(self._references[key])

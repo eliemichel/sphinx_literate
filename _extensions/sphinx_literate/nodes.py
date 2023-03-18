@@ -2,6 +2,8 @@ from docutils import nodes
 
 import html
 
+from .registry import Key, CodeBlock
+
 #############################################################
 
 class TangleNode(nodes.General, nodes.Element):
@@ -33,23 +35,24 @@ class LiterateHighlighter:
         highlighted = self._original_highlighter.highlight_block(rawsource, lang, **kwargs)
 
         # Post-process: Replace hashes with links
-        for hashcode, lit in self.node.hashcode_to_lit.items():
+        for uid, lit in self.node.uid_to_lit.items():
             ref = self.ref_factory(self.node, lit)
-            highlighted = highlighted.replace(hashcode, ref)
+            highlighted = highlighted.replace(uid, ref)
 
         return highlighted
 
 #############################################################
 
 class LiterateNode(nodes.General, nodes.Element):
-    def __init__(self, literal_node, lit, *args):
+    def __init__(self, literal_node, lit: CodeBlock, *args):
         """
         We wrap a literal node and insert links to references code blocks
         """
         self._literal_node = literal_node
-        self.hashcode_to_block_key = {}
-        self.hashcode_to_lit = {}
+        self.uid_to_block_key = {}
+        self.uid_to_lit = {}
         self.lit = lit
+        self.references: List[CodeBlock] = []
         super().__init__(*args)
 
     @classmethod
@@ -120,6 +123,17 @@ class LiterateNode(nodes.General, nodes.Element):
             # Restore highlighter
             self.highlighter = original_highlighter
 
+            ref_links = ''
+            if node.references:
+                ref_links = ', referenced in '
+                for ref in node.references:
+                    lit_id = ref.target['refid']
+                    ref_links += (
+                        html.escape(app.config.lit_begin_ref) +
+                        f'<a href="#{lit_id}">{html.escape(ref.name)}</a>' +
+                        html.escape(app.config.lit_end_ref)
+                    )
+
             # Footer
             self.body.append(
                 '<div class="lit-block-footer">' +
@@ -127,6 +141,7 @@ class LiterateNode(nodes.General, nodes.Element):
                 ' <span class="lit-name">' +
                 html.escape(node.lit.name) +
                 '</span> ' +
+                ref_links +
                 html.escape(app.config.lit_end_ref) +
                 '</div>'
             )

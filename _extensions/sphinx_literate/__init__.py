@@ -76,18 +76,20 @@ def purge_lit_codeblocks(app, env, docname):
 
 def merge_lit_codeblocks(app, env, docnames, other):
     lit_codeblocks = CodeBlockRegistry.from_env(env)
-
-    for lit in CodeBlockRegistry.from_env(other).blocks():
-        lit_codeblocks.add_codeblock(lit)
+    lit_codeblocks.merge(CodeBlockRegistry.from_env(other))
 
 def process_literate_nodes(app, doctree, fromdocname):
     lit_codeblocks = CodeBlockRegistry.from_env(app.builder.env)
 
     for literate_node in doctree.findall(LiterateNode):
-        literate_node.hashcode_to_lit = {
+        literate_node.uid_to_lit = {
             h: lit_codeblocks.get_by_key(key)
-            for h, key in literate_node.hashcode_to_block_key.items()
+            for h, key in literate_node.uid_to_block_key.items()
         }
+        literate_node.references = [
+            lit_codeblocks.get_by_key(k)
+            for k in lit_codeblocks.references_to_key(literate_node.lit.key)
+        ]
 
     for tangle_node in doctree.findall(TangleNode):
         lit = lit_codeblocks.get(tangle_node.root_block_name)
