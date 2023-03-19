@@ -130,6 +130,17 @@ class CodeBlock:
             maybe_root = f" (in root '{self.tangle_root}')"
         return f"'{self.name}'{maybe_root}"
 
+    def link_url(self, fromdocname: str, builder):
+        """
+        @param fromdocname Name of the document from which the url will be used
+        @param builder sphinx html builder (or any object that provides a
+                       get_relative_uri method)
+        """
+        return (
+            builder.get_relative_uri(fromdocname, self.source_location.docname)
+            + '#' + self.target['refid']
+        )
+
 #############################################################
 
 @dataclass

@@ -106,10 +106,7 @@ def process_literate_nodes(app, doctree, fromdocname):
 
         refnode = nodes.reference('', '')
         refnode['refdocname'] = lit.source_location.docname
-        refnode['refuri'] = (
-            app.builder.get_relative_uri(fromdocname, lit.source_location.docname)
-            + '#' + lit.target['refid']
-        )
+        refnode['refuri'] = lit.link_url(fromdocname, app.builder)
         refnode.append(nodes.emphasis(_('here'), _('here')))
         para += refnode
         

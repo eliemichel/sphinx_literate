@@ -93,10 +93,10 @@ class LiterateNode(nodes.General, nodes.Element):
             )
             refnode.append(nodes.Text(lit.name))
             """
-            lit_id = lit.target['refid']
+            url = lit.link_url(node.lit.source_location.docname, app.builder)
             return (
                 app.config.lit_begin_ref +
-                f'<a href="#{lit_id}">{lit.name}</a>' +
+                f'<a href="{url}">{lit.name}</a>' +
                 app.config.lit_end_ref
             )
 
@@ -122,8 +122,11 @@ class LiterateNode(nodes.General, nodes.Element):
             # Restore highlighter
             self.highlighter = original_highlighter
 
+            docname = node.lit.source_location.docname
+
             def make_link(lit, class_name=None):
                 refid = lit.target['refid']
+                url = lit.link_url(docname, self.builder)
 
                 name = lit.name
                 # Whether there are other blocks with the same name in the same tangle root
@@ -142,7 +145,7 @@ class LiterateNode(nodes.General, nodes.Element):
 
                 return (
                     html.escape(app.config.lit_begin_ref) +
-                    f'&nbsp;<a href="#{refid}">' +
+                    f'&nbsp;<a href="{url}">' +
                         begin_span +
                             html.escape(name) +
                         end_span +
