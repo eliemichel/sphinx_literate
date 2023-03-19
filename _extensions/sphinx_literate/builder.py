@@ -64,7 +64,7 @@ class TangleBuilder(Builder):
         if lit.tangle_root is not None:
             filename = path.join(lit.tangle_root, filename)
 
-        tangled_content = tangle(lit.name, lit.tangle_root, lit_codeblocks, self.app.config)
+        tangled_content, root_lit = tangle(lit.name, lit.tangle_root, lit_codeblocks, self.app.config)
 
         outfilename = path.join(self.outdir, filename)
         ensuredir(path.dirname(outfilename))

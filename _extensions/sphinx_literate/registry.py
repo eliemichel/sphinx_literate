@@ -47,6 +47,9 @@ class CodeBlock:
     # The index of the block in the child list
     child_index: int = 0
 
+    # This tells when the block superseeds a block from the parent
+    is_override: bool = False
+
     @property
     def key(self) -> Key:
         return self.build_key(self.name, self.tangle_root)
@@ -59,10 +62,16 @@ class CodeBlock:
 
     def all_content(self):
         """
-        Iterate on all lines of content, including children
+        Iterate on all lines of content, including children, and overridden
+        parent.
         """
+        if self.is_override and self.prev is not None:
+            for l in self.prev.all_content():
+                yield l
+
         for l in self.content:
             yield l
+
         if self.next is not None:
             for l in self.next.all_content():
                 yield l
@@ -145,7 +154,7 @@ class CodeBlockRegistry:
         @param lit block to append
         """
         key = lit.key
-        existing = self._blocks.get(key)
+        existing = self.get_rec(lit.name, lit.tangle_root)
 
         if existing is None:
             maybe_root = ''
@@ -156,18 +165,26 @@ class CodeBlockRegistry:
             )
             raise ExtensionError(message, modname="sphinx_literate")
 
-        # Insert at the end of the child list
-        while existing.next is not None:
-            existing = existing.next
-        existing.next = lit
-        lit.prev = existing
+        lit.is_override = existing.tangle_root != lit.tangle_root
 
-        # Update child index for 'lit' and its children
-        child_index = existing.child_index + 1
-        while lit is not None:
-            lit.child_index = child_index
-            child_index += 1
-            lit = lit.next
+        if lit.is_override:
+            # Local override
+            self._blocks[key] = lit
+            lit.prev = existing
+
+        else:
+            # Insert at the end of the child list
+            while existing.next is not None:
+                existing = existing.next
+            existing.next = lit
+            lit.prev = existing
+
+            # Update child index for 'lit' and its children
+            child_index = existing.child_index + 1
+            while lit is not None:
+                lit.child_index = child_index
+                child_index += 1
+                lit = lit.next
 
     def replace_codeblock(self, lit: CodeBlock) -> None:
         """
@@ -186,6 +203,7 @@ class CodeBlockRegistry:
             )
             raise ExtensionError(message, modname="sphinx_literate")
 
+        lit.is_override = existing.tangle_root != lit.tangle_root
         self._blocks[lit.key] = lit
 
     def add_reference(self, referencer: Key, referencee: Key) -> None:
@@ -240,9 +258,6 @@ class CodeBlockRegistry:
     def blocks(self) -> CodeBlock:
         return self._blocks.values()
 
-    def get_by_key(self, key: Key) -> CodeBlock:
-        return self._blocks.get(key)
-
     def get(self, name: str, tangle_root: str | None = None) -> CodeBlock:
         return self.get_by_key(CodeBlock.build_key(name, tangle_root))
 
@@ -261,7 +276,14 @@ class CodeBlockRegistry:
             hierarchy = self._hierarchy.get(hierarchy.parent)
         return None
 
-    def keys(self, key: Key) -> dict_keys:
+    def get_by_key(self, key: Key) -> CodeBlock:
+        return self._blocks.get(key)
+
+    def get_rec_by_key(self, key: Key) -> CodeBlock:
+        tangle_root, name = key.split("##")
+        return self.get_rec(name, tangle_root)
+
+    def keys(self) -> dict_keys:
         return self._blocks.keys()
 
     def items(self) -> dict_items:

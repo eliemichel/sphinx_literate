@@ -83,7 +83,7 @@ def process_literate_nodes(app, doctree, fromdocname):
 
     for literate_node in doctree.findall(LiterateNode):
         literate_node.uid_to_lit = {
-            h: lit_codeblocks.get_by_key(key)
+            h: lit_codeblocks.get_rec_by_key(key)
             for h, key in literate_node.uid_to_block_key.items()
         }
         literate_node.references = [
@@ -92,13 +92,14 @@ def process_literate_nodes(app, doctree, fromdocname):
         ]
 
     for tangle_node in doctree.findall(TangleNode):
-        lit = lit_codeblocks.get(tangle_node.root_block_name)
-        if lit is None:
-            message = (
-                f"Literate code block not found: '{tangle_node.root_block_name}' " +
-                f"(in tangle directive from document {tangle_node.docname}, line {tangle_node.lineno})"
-            )
-            raise ExtensionError(message, modname="sphinx_literate")
+
+        tangled_content, lit = tangle(
+            tangle_node.block_name,
+            tangle_node.tangle_root,
+            lit_codeblocks,
+            app.config,
+            f"in tangle directive from document '{tangle_node.docname}'', line {tangle_node.lineno}, "
+        )
 
         para = nodes.paragraph()
         para += nodes.Text(f"Tangled block '{lit.name}' [from ")
@@ -113,13 +114,6 @@ def process_literate_nodes(app, doctree, fromdocname):
         para += refnode
         
         para += nodes.Text("]")
-
-        tangled_content = tangle(
-            tangle_node.root_block_name,
-            tangle_node.tangle_root,
-            lit_codeblocks,
-            app.config,
-        )
 
         lexer = tangle_node.lexer
         if lexer is None:

@@ -73,11 +73,11 @@ class TangleDirective(SphinxCodeBlock):
         return [
             TangleNode(
                 parsed_title.name,
+                tangle_root,
                 parsed_title.lexer,
                 self.env.docname,
                 self.lineno,
                 raw_block_node,
-                tangle_root
             )
         ]
 

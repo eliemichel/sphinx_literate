@@ -11,5 +11,6 @@ Contents
 
 doc/introduction
 doc/demo
+doc/override-demo
 doc/incremental-demo/index
 ```

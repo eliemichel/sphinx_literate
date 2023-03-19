@@ -78,3 +78,69 @@ For instance:
 :tangle-root: incremental-demo
 ```
 ````
+
+Inheritance
+-----------
+
+When a tangle root inherit from another one (i.e., this other one is set as its parent), it can reference previously defined blocks:
+
+````
+```{lit-setup}
+:tangle-root: versionA
+```
+
+```{lit} A block
+foo
+```
+
+```{lit} Another block
+bar
+{{A block}}
+```
+````
+
+````
+```{lit-setup}
+:tangle-root: versionB
+:parent: versionA
+```
+
+```{lit} Result block
+{{A block}}
+{{Another block}}
+```
+````
+
+Tangling `Result block` gives:
+
+```
+foo
+bar
+foo
+```
+
+When defining a block in a child tangle root with the same name as a block previously defined in the parent, it does not change the content of parent tangling, unless they use modifier options like 'replace' and 'append':
+
+````
+```{lit-setup}
+:tangle-root: versionC
+:parent: versionA
+```
+
+```{lit} A block (replace)
+new foo
+```
+
+```{lit} Result block
+{{A block}}
+{{Another block}}
+```
+````
+
+Tangling `Result block` gives:
+
+```
+new foo
+bar
+foo
+```

@@ -51,7 +51,8 @@ def tangle(
     block_name: str,
     tangle_root: str | None,
     registry: CodeBlockRegistry,
-    config # sphinx app config
+    config, # sphinx app config
+    error_context: str = ""
 ) -> List[str]:
     """
     Tangle a given code block, i.e. resolve all the references to generate a
@@ -61,14 +62,17 @@ def tangle(
            same name may exist only if they belong to different root directories.
     @param registry the registry containing all the code blocks extracted
                     from the source documentation.
-    @return the generated source code as a list of lines
+    @param config sphinx app config
+    @param error_context optional string added to error messages
+    @return the generated source code as a list of lines, and the root lit block
     """
     lit = registry.get_rec(block_name, tangle_root)
     if lit is None:
         message = (
             f"Literate code block not found: '{block_name}' " +
-            f"(in root '{tangle_root}')"
+            f"({error_context}in root '{tangle_root}')"
         )
+        print(list(lit_codeblocks.keys()))
         raise ExtensionError(message, modname="sphinx_literate")
 
     tangled_content = []
@@ -79,4 +83,4 @@ def tangle(
         config.lit_end_ref,
         tangled_content,
     )
-    return tangled_content
+    return tangled_content, lit

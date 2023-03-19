@@ -7,13 +7,13 @@ from .registry import Key, CodeBlock
 #############################################################
 
 class TangleNode(nodes.General, nodes.Element):
-    def __init__(self, root_block_name, lexer, docname, lineno, raw_block_node, tangle_root, *args):
+    def __init__(self, block_name, tangle_root, lexer, docname, lineno, raw_block_node, *args):
+        self.block_name = block_name
+        self.tangle_root = tangle_root
         self.lexer = lexer
-        self.root_block_name = root_block_name
         self.docname = docname
         self.lineno = lineno
         self.raw_block_node = raw_block_node
-        self.tangle_root = tangle_root
 
         super().__init__(*args)
 
