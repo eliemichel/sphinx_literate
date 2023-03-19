@@ -10,7 +10,7 @@ Contents
 :titlesonly:
 
 introduction
-demo
+simple-demo/index
 override-demo
 incremental-demo/index
 internal-details

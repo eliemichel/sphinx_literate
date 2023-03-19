@@ -64,8 +64,8 @@ html_theme = 'furo'
 html_theme_options = {
     "announcement": "<em>Important</em> This project is a work in progress!",
 
-    #"light_logo": "webgpu-light.svg",
-    #"dark_logo": "webgpu-dark.svg",
+    "light_logo": "logo.svg",
+    "dark_logo": "logo.svg",
     "sidebar_hide_name": True,
     "navigation_with_keys": True,
     "light_css_variables": {
