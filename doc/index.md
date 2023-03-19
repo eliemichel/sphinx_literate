@@ -9,8 +9,9 @@ Contents
 ```{toctree}
 :titlesonly:
 
-doc/introduction
-doc/demo
-doc/override-demo
-doc/incremental-demo/index
+introduction
+demo
+override-demo
+incremental-demo/index
+internal-details
 ```

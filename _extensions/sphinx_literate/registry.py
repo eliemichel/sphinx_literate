@@ -6,6 +6,23 @@ from collections import defaultdict
 from sphinx.errors import ExtensionError
 
 #############################################################
+
+@dataclass
+class SourceLocation:
+    """
+    Represents a location in the documentation's source
+    """
+
+    # Name of the document
+    docname: str = ""
+
+    # Line number at which the block was defined in the source document
+    lineno: int = -1
+
+    def format(self):
+        return f"document '{self.docname}', line {self.lineno}"
+
+#############################################################
 # Codeblock
 
 Key = str
@@ -20,14 +37,11 @@ class CodeBlock:
     # Name of the code block (see title parsing)
     name: str = ""
 
-    # Source document where the block was defined
-    docname: str = ""
+    # Source document/line where the block was defined
+    source_location: SourceLocation = field(default_factory=SourceLocation)
 
     # Tangle root as defined by lit-setup at the time the block was created
     tangle_root: str | None = ""
-
-    # Line number at which the code block was defined in the source document
-    lineno: int = -1
 
     # A list of lines
     content: List[str] = field(default_factory=list)
@@ -39,42 +53,82 @@ class CodeBlock:
 
     # NB: Fields bellow are handled by the registry
 
-    # A block has children when it gets appended some content in later blocks
-    # (this is a basic doubly linked list)
+    # A block has children when it gets appended/replaced some content in later
+    # blocks (this is a basic doubly linked list)
     next: CodeBlock | None = None
     prev: CodeBlock | None = None
+
+    # This is either 'NEW, 'APPEND' or 'REPLACE', telling whether this block's
+    # content must be added to the result of evaluating the previous ones or
+    # whether it replaces the previous content.
+    # The difference between NEW and REPLACE is that REPLACE affects lit
+    # references in the parent tangle but NEW creates an independant chain of
+    # blocks (which may or may not have the same name as one block from the
+    # parent tangle root, but it does not matter).
+    relation_to_prev: str = 'NEW'
 
     # The index of the block in the child list
     child_index: int = 0
 
-    # This tells when the block superseeds a block from the parent
-    is_override: bool = False
+    @classmethod
+    def build_key(cls, name: str, tangle_root: str | None = None) -> Key:
+        if tangle_root is None:
+            tangle_root = ""
+        return tangle_root + "##" + name
 
     @property
     def key(self) -> Key:
         return self.build_key(self.name, self.tangle_root)
 
-    @classmethod
-    def build_key(cls, name, tangle_root=None) -> Key:
-        if tangle_root is None:
-            tangle_root = ""
-        return tangle_root + "##" + name
+    def add_block(self, lit: CodeBlock) -> None:
+        """
+        Add a block at the end of the chained list
+        """
+        last = self
+        while last.next is not None:
+            last = last.next
+        last.next = lit
+        lit.prev = last
+
+        # Update child index for 'lit' and its children
+        child_index = last.child_index + 1
+        while lit is not None:
+            lit.child_index = child_index
+            child_index += 1
+            lit = lit.next
 
     def all_content(self):
         """
         Iterate on all lines of content, including children, and overridden
         parent.
         """
-        if self.is_override and self.prev is not None:
-            for l in self.prev.all_content():
+
+        # Find the last REPLACE of the chain
+        start = self
+        lit = start
+        while lit is not None:
+            if lit.relation_to_prev == 'REPLACE':
+                start = lit
+            lit = lit.next
+
+        # If no replace, maybe add source from the parent tangle
+        if start.prev is not None and start.relation_to_prev == 'APPEND':
+            assert(start.prev.tangle_root != start.tangle_root)
+            for l in start.prev.all_content():
                 yield l
 
-        for l in self.content:
-            yield l
-
-        if self.next is not None:
-            for l in self.next.all_content():
+        # Content of the start and next blocks
+        lit = start
+        while lit is not None:
+            for l in lit.content:
                 yield l
+            lit = lit.next
+
+    def format(self):
+        maybe_root = ''
+        if self.tangle_root is not None:
+            maybe_root = f" (in root '{self.tangle_root}')"
+        return f"'{self.name}'{maybe_root}"
 
 #############################################################
 
@@ -86,8 +140,7 @@ class TangleHierarchyEntry:
     """
     root: str
     parent: str
-    docname: str
-    lineno: int
+    source_location: SourceLocation
 
 #############################################################
 # Codeblock registry
@@ -132,19 +185,17 @@ class CodeBlockRegistry:
             raise ExtensionError(message, modname="sphinx_literate")
 
         key = lit.key
-        existing = self._blocks.get(key)
+        existing = self.get_by_key(key)
 
         if existing is not None:
-            maybe_root = ''
-            if lit.tangle_root is not None:
-                maybe_root = f" (in root '{lit.tangle_root}')"
             message = (
-                f"Multiple literate code blocks with the same name '{lit.name}'{maybe_root} were found:\n" +
-                f"  - In document '{existing.docname}', line {existing.lineno}.\n"
-                f"  - In document '{lit.docname}', line {lit.lineno}.\n"
+                f"Multiple literate code blocks with the same name {lit.format()} were found:\n" +
+                f"  - In {existing.source_location.format()}.\n"
+                f"  - In {lit.source_location.format()}.\n"
             )
             raise ExtensionError(message, modname="sphinx_literate")
 
+        lit.relation_to_prev = 'NEW'
         self._blocks[key] = lit
 
     def append_codeblock(self, lit: CodeBlock) -> None:
@@ -153,38 +204,7 @@ class CodeBlockRegistry:
         the same name. Raises an exception if such a block does not exist.
         @param lit block to append
         """
-        key = lit.key
-        existing = self.get_rec(lit.name, lit.tangle_root)
-
-        if existing is None:
-            maybe_root = ''
-            if lit.tangle_root is not None:
-                maybe_root = f" (in root '{lit.tangle_root}')"
-            message = (
-                f"Trying to append to a non existing literate code blocks '{lit.name}'{maybe_root}"
-            )
-            raise ExtensionError(message, modname="sphinx_literate")
-
-        lit.is_override = existing.tangle_root != lit.tangle_root
-
-        if lit.is_override:
-            # Local override
-            self._blocks[key] = lit
-            lit.prev = existing
-
-        else:
-            # Insert at the end of the child list
-            while existing.next is not None:
-                existing = existing.next
-            existing.next = lit
-            lit.prev = existing
-
-            # Update child index for 'lit' and its children
-            child_index = existing.child_index + 1
-            while lit is not None:
-                lit.child_index = child_index
-                child_index += 1
-                lit = lit.next
+        self._append_or_replace_codeblock(lit, 'APPEND')
 
     def replace_codeblock(self, lit: CodeBlock) -> None:
         """
@@ -192,19 +212,32 @@ class CodeBlockRegistry:
         exception if such a block does not exist.
         @param lit block to append
         """
+        self._append_or_replace_codeblock(lit, 'REPLACE')
+
+    def _append_or_replace_codeblock(self, lit: CodeBlock, relation_to_prev: str):
+        """
+        Shared behavior between append_codeblock() and replace_codeblock()
+        """
         existing = self.get_rec(lit.name, lit.tangle_root)
 
         if existing is None:
-            maybe_root = ''
-            if lit.tangle_root is not None:
-                maybe_root = f" (in root '{lit.tangle_root}')"
+            action_str = {
+                'APPEND': "append to",
+                'REPLACE': "replace",
+            }[relation_to_prev]
             message = (
-                f"Trying to replace a non existing literate code blocks '{lit.name}'{maybe_root}"
+                f"Trying to {action_str} a non existing literate code blocks {lit.format()}\n" +
+                f"  - In {lit.source_location.format()}.\n"
             )
             raise ExtensionError(message, modname="sphinx_literate")
 
-        lit.is_override = existing.tangle_root != lit.tangle_root
-        self._blocks[lit.key] = lit
+        lit.relation_to_prev = relation_to_prev
+        
+        if existing.tangle_root != lit.tangle_root:
+            self._blocks[lit.key] = lit
+            lit.prev = existing
+        else:
+            existing.add_block(lit)
 
     def add_reference(self, referencer: Key, referencee: Key) -> None:
         """
@@ -226,10 +259,10 @@ class CodeBlockRegistry:
         self._blocks = {
             key: lit
             for key, lit in self._blocks.items()
-            if lit.docname != docname
+            if lit.source_location.docname != docname
         }
 
-    def set_tangle_parent(self, tangle_root: str, parent: str, docname: str, lineno: int) -> None:
+    def set_tangle_parent(self, tangle_root: str, parent: str, source_location: SourceLocation) -> None:
         """
         Set the parent for a given tangle root. Fail if a different root has
         already been defined.
@@ -243,16 +276,15 @@ class CodeBlockRegistry:
             if existing.parent != parent:
                 message = (
                     f"Attempting to set the tangle parent for root '{tangle_root}' to a different value:\n" +
-                    f"  Was set to '{existing.parent}' in document '{existing.docname}', line {existing.lineno}.\n"
-                    f"  But trying to set to '{parent}' in document '{docname}', line {lineno}.\n"
+                    f"  Was set to '{existing.parent}' in {existing.source_location.format()}.\n"
+                    f"  But trying to set to '{parent}' in {source_location.format()}.\n"
                 )
                 raise ExtensionError(message, modname="sphinx_literate")
         else:
             self._hierarchy[tangle_root] = TangleHierarchyEntry(
                 root = tangle_root,
                 parent = parent,
-                docname = docname,
-                lineno = lineno
+                source_location = source_location,
             )
 
     def blocks(self) -> CodeBlock:

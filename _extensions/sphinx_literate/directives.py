@@ -11,7 +11,7 @@ from sphinx.directives.code import CodeBlock as SphinxCodeBlock
 from sphinx.application import Sphinx
 
 from .parse import parse_block_content, parse_block_title
-from .registry import CodeBlock, CodeBlockRegistry
+from .registry import CodeBlock, CodeBlockRegistry, SourceLocation
 from .nodes import LiterateNode, TangleNode
 
 #############################################################
@@ -47,8 +47,10 @@ class LiterateSetupDirective(SphinxDirective):
             reg.set_tangle_parent(
                 tangle_root,
                 tangle_parent,
-                self.env.docname,
-                self.lineno,
+                SourceLocation(
+                    docname = self.env.docname,
+                    lineno = self.lineno,
+                ),
             )
 
         return []
@@ -75,8 +77,10 @@ class TangleDirective(SphinxCodeBlock):
                 parsed_title.name,
                 tangle_root,
                 parsed_title.lexer,
-                self.env.docname,
-                self.lineno,
+                SourceLocation(
+                    docname = self.env.docname,
+                    lineno = self.lineno,
+                ),
                 raw_block_node,
             )
         ]
@@ -99,13 +103,15 @@ class LiterateDirective(SphinxCodeBlock):
         targetnode = nodes.target('', '', ids=[targetid])
 
         self.lit = CodeBlock(
-            name=parsed_title.name,
-            docname=self.env.docname,
-            lineno=self.lineno,
-            content=self.content,
-            target=targetnode,
-            lexer=parsed_title.lexer,
-            tangle_root=tangle_root,
+            name = parsed_title.name,
+            tangle_root = tangle_root,
+            source_location = SourceLocation(
+                docname = self.env.docname,
+                lineno = self.lineno,
+            ),
+            content = self.content,
+            target = targetnode,
+            lexer = parsed_title.lexer,
         )
 
         lit_codeblocks = CodeBlockRegistry.from_env(self.env)

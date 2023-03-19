@@ -2,17 +2,16 @@ from docutils import nodes
 
 import html
 
-from .registry import Key, CodeBlock
+from .registry import Key, CodeBlock, SourceLocation
 
 #############################################################
 
 class TangleNode(nodes.General, nodes.Element):
-    def __init__(self, block_name, tangle_root, lexer, docname, lineno, raw_block_node, *args):
+    def __init__(self, block_name, tangle_root, lexer, source_location, raw_block_node, *args):
         self.block_name = block_name
         self.tangle_root = tangle_root
         self.lexer = lexer
-        self.docname = docname
-        self.lineno = lineno
+        self.source_location = source_location
         self.raw_block_node = raw_block_node
 
         super().__init__(*args)

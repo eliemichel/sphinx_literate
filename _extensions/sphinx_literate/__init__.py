@@ -98,16 +98,16 @@ def process_literate_nodes(app, doctree, fromdocname):
             tangle_node.tangle_root,
             lit_codeblocks,
             app.config,
-            f"in tangle directive from document '{tangle_node.docname}'', line {tangle_node.lineno}, "
+            f"in tangle directive from {tangle_node.source_location.format()}, "
         )
 
         para = nodes.paragraph()
         para += nodes.Text(f"Tangled block '{lit.name}' [from ")
 
         refnode = nodes.reference('', '')
-        refnode['refdocname'] = lit.docname
+        refnode['refdocname'] = lit.source_location.docname
         refnode['refuri'] = (
-            app.builder.get_relative_uri(fromdocname, lit.docname)
+            app.builder.get_relative_uri(fromdocname, lit.source_location.docname)
             + '#' + lit.target['refid']
         )
         refnode.append(nodes.emphasis(_('here'), _('here')))
