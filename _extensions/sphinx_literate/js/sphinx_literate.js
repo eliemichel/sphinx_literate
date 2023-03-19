@@ -7,6 +7,36 @@ const config = {
 	end_ref: "}}",
 };
 
+const lightStyleVariables = `
+--color-background-lit-info: #d5eca8;
+--color-foreground-lit-info: rgb(113, 138, 26);
+`;
+
+const darkStyleVariables = `
+--color-background-lit-info: #3e3d35;
+//--color-foreground-lit-info: rgba(0, 0, 0, 0.39);
+--color-foreground-lit-info: rgb(142, 142, 142);
+`;
+
+// Reproduce Furo's light/dark theme mechanism
+const styleVariables = `
+body {
+	${lightStyleVariables}
+}
+
+@media not print {
+body[data-theme="dark"] {
+	${darkStyleVariables}
+}
+
+@media (prefers-color-scheme: dark) {
+body:not([data-theme="light"]) {
+	${darkStyleVariables}
+}
+}
+}
+`;
+
 const commonStyle = `
 a:hover {
 	color: var(--color-link--hover);
@@ -36,8 +66,8 @@ const litBlockInfoStyle = `
 	bottom: -0.7em;
 	right: 0.5em;
 	margin-top: 0;
-	color: rgba(0, 0, 0, 0.39);
-	background-color: #3e3d35;
+	color: var(--color-foreground-lit-info);
+	background-color: var(--color-background-lit-info);
 	border-radius: 0.3em;
 	padding: 0 0.3em;
 }
@@ -81,10 +111,9 @@ class LitBlockInfo extends HTMLDivElement {
 		const data = JSON.parse(this.getAttribute("data"));
 		const shadow = this.attachShadow({ mode: "open" });
 
-		console.log(data);
-
 		const wrapper = document.createElement("div");
 		wrapper.setAttribute("class", "wrapper");
+		wrapper.setAttribute("data-theme", "dark");
 
 		wrapper.append(...this.createLitLink(data.name, data.permalink, "lit-name"));
 
@@ -122,3 +151,14 @@ class LitBlockInfo extends HTMLDivElement {
 
 customElements.define("lit-block-info", LitBlockInfo, { extends: "div" });
 
+// Inject in Furo theme
+function onDOMContentLoaded() {
+	console.log("onDOMContentLoaded");
+	const style = document.createElement("style");
+	style.textContent = styleVariables;
+	document.head.append(style);
+
+	const x = document.querySelectorAll(".content-icon-container");
+	console.log(x);
+}
+document.addEventListener('DOMContentLoaded', onDOMContentLoaded, {once: true});
