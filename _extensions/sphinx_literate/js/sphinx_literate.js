@@ -1,11 +1,18 @@
 // NB: This style has been designed for the Furo theme.
 
+// Read-only
 const config = {
 	//begin_ref: "{{\u00a0",
 	//end_ref: "\u00a0}}",
 	begin_ref: "{{",
 	end_ref: "}}",
 };
+
+// Tunable by the user
+const options = {
+	showReferenceDetails: true,
+};
+const litOptionsChangedEvent = new Event("litOptionsChanged");
 
 const lightStyleVariables = `
 --color-background-lit-info: #d5eca8;
@@ -122,8 +129,18 @@ class LitBlockInfo extends HTMLDivElement {
 	}
 
 	connectedCallback() {
+		this.attachShadow({ mode: "open" });
+		this.rebuildShadow();
+
+		// Callbacks
+		console.log(litOptionsChangedEvent.type);
+		document.addEventListener(litOptionsChangedEvent.type, (function() {
+			this.rebuildShadow();
+		}).bind(this));
+	}
+
+	rebuildShadow() {
 		const data = JSON.parse(this.getAttribute("data"));
-		const shadow = this.attachShadow({ mode: "open" });
 
 		const wrapper = document.createElement("div");
 		wrapper.setAttribute("class", "wrapper");
@@ -131,20 +148,22 @@ class LitBlockInfo extends HTMLDivElement {
 
 		wrapper.append(...this.createLitLink(data.name, data.permalink, "lit-name"));
 
-		const details = ['replaced by', 'completed in', 'completing', 'replacing', 'referenced in'];
-		details.map(section => {
-			if (data[section].length > 0) {
-				wrapper.append(document.createTextNode(" " + section + " "));
-				data[section].map(lit => {
-					wrapper.append(...this.createLitLink(lit.name, lit.url));
-				});
-			}
-		});
+		if (options.showReferenceDetails) {
+			const details = ['replaced by', 'completed in', 'completing', 'replacing', 'referenced in'];
+			details.map(section => {
+				if (data[section].length > 0) {
+					wrapper.append(document.createTextNode(" " + section + " "));
+					data[section].map(lit => {
+						wrapper.append(...this.createLitLink(lit.name, lit.url));
+					});
+				}
+			});
+		}
 
 		const style = document.createElement("style");
 		style.textContent = commonStyle + litBlockInfoStyle;
 
-		shadow.append(style, wrapper);
+		this.shadowRoot.replaceChildren(style, wrapper);
 	}
 
 	createLitLink(name, url, className) {
@@ -178,16 +197,30 @@ const literateBtnTemplate = `
 
 // Inject in Furo theme
 function onDOMContentLoaded() {
+	// Add global style
 	const style = document.createElement("style");
 	style.textContent = styleVariables;
 	document.head.append(style);
 
+	// Add literate button (could be done through the template, anyway, not used ATM)
+	/*
 	const containers = document.querySelectorAll(".content-icon-container")
 	for (let i = 0 ; i < containers.length ; ++i) {
 		const literateBtn = document.createElement("div");
 		literateBtn.setAttribute("class", "literate-options");
 		literateBtn.innerHTML = literateBtnTemplate;
 		containers[i].insertBefore(literateBtn, containers[i].children[0]);
+	}
+	*/
+
+	// Connect elements to literate options
+	const input = document.getElementById("lit-opts-show-reference-details");
+	if (input !== null) {
+		input.cheched = options.showReferenceDetails;
+		input.addEventListener('click', function(e) {
+			options.showReferenceDetails = input.checked;
+			document.dispatchEvent(litOptionsChangedEvent);
+		});
 	}
 }
 document.addEventListener('DOMContentLoaded', onDOMContentLoaded, {once: true});
