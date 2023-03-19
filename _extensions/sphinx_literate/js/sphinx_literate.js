@@ -16,7 +16,7 @@ class Options {
 		this.defaultOptions = {
 			showBlockName: false,
 			showReferenceDetails: false,
-			showReferenceAsComment: true,
+			showReferenceLinks: false,
 		}
 
 		for (const [key, value] of Object.entries(this.defaultOptions)) {
@@ -149,14 +149,7 @@ class LitRef extends HTMLSpanElement {
 	}
 
 	rebuildShadow() {
-		if (options.get('showReferenceAsComment')) {
-			// TODO: comment depends on language... (must be given by sphinx build)
-			const comment = document.createElement("span");
-			comment.textContent = "// [...] " + this.getAttribute("name");
-			comment.setAttribute("class", "comment");
-
-			this.shadowRoot.replaceChildren(this.styleElement, comment);
-		} else {
+		if (options.get('showReferenceLinks')) {
 			const open = document.createTextNode(config.begin_ref);
 
 			const close = document.createTextNode(config.end_ref);
@@ -166,6 +159,13 @@ class LitRef extends HTMLSpanElement {
 			link.href = this.getAttribute("href");
 
 			this.shadowRoot.replaceChildren(this.styleElement, open, link, close);
+		} else {
+			// TODO: comment depends on language... (must be given by sphinx build)
+			const comment = document.createElement("span");
+			comment.textContent = "// [...] " + this.getAttribute("name");
+			comment.setAttribute("class", "comment");
+
+			this.shadowRoot.replaceChildren(this.styleElement, comment);
 		}
 	}
 }
@@ -268,7 +268,7 @@ function onDOMContentLoaded() {
 	const checkboxIdToOption = {
 		"lit-opts-show-block-name": "showBlockName",
 		"lit-opts-show-reference-details": "showReferenceDetails",
-		"lit-opts-show-reference-as-comment": "showReferenceAsComment",
+		"lit-opts-show-reference-links": "showReferenceLinks",
 	}
 	for (const [id, opt] of Object.entries(checkboxIdToOption)) {
 		const input = document.getElementById(id);
