@@ -8,11 +8,28 @@ const config = {
 	end_ref: "}}",
 };
 
-// Tunable by the user
-const options = {
-	showReferenceDetails: true,
-};
+// Options tunable by the user
+function initOptions() {
+	localStorage.setItem("showReferenceDetails", true);
+}
+function getOption(key) {
+	const boolean = (x) => x === "true";
+	const cast = {
+		showReferenceDetails: boolean,
+	}[key];
+	return cast(localStorage.getItem(key));
+}
 const litOptionsChangedEvent = new Event("litOptionsChanged");
+function setOption(key, value) {
+	localStorage.setItem(key, value);
+	document.dispatchEvent(litOptionsChangedEvent);
+}
+if (localStorage.getItem("showReferenceDetails") === undefined) {
+	console.log("init options");
+	initOptions();
+} else {
+	console.log("loaded options: showReferenceDetails = " + getOption("showReferenceDetails"));
+}
 
 const lightStyleVariables = `
 --color-background-lit-info: #d5eca8;
@@ -133,7 +150,6 @@ class LitBlockInfo extends HTMLDivElement {
 		this.rebuildShadow();
 
 		// Callbacks
-		console.log(litOptionsChangedEvent.type);
 		document.addEventListener(litOptionsChangedEvent.type, (function() {
 			this.rebuildShadow();
 		}).bind(this));
@@ -148,7 +164,7 @@ class LitBlockInfo extends HTMLDivElement {
 
 		wrapper.append(...this.createLitLink(data.name, data.permalink, "lit-name"));
 
-		if (options.showReferenceDetails) {
+		if (getOption('showReferenceDetails')) {
 			const details = ['replaced by', 'completed in', 'completing', 'replacing', 'referenced in'];
 			details.map(section => {
 				if (data[section].length > 0) {
@@ -216,10 +232,9 @@ function onDOMContentLoaded() {
 	// Connect elements to literate options
 	const input = document.getElementById("lit-opts-show-reference-details");
 	if (input !== null) {
-		input.cheched = options.showReferenceDetails;
+		input.checked = getOption('showReferenceDetails');
 		input.addEventListener('click', function(e) {
-			options.showReferenceDetails = input.checked;
-			document.dispatchEvent(litOptionsChangedEvent);
+			setOption('showReferenceDetails', input.checked);
 		});
 	}
 }
