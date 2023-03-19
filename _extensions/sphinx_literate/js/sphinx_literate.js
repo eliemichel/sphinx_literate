@@ -35,6 +35,20 @@ body:not([data-theme="light"]) {
 }
 }
 }
+
+/* Global style as well */
+.content-icon-container .literate-options button {
+	border: none;
+	background: none;
+	margin: 0;
+	padding: 0;
+	cursor: pointer;
+}
+.content-icon-container .literate-options svg {
+  color: inherit;
+  height: 1rem;
+  width: 1rem;
+}
 `;
 
 const commonStyle = `
@@ -151,14 +165,29 @@ class LitBlockInfo extends HTMLDivElement {
 
 customElements.define("lit-block-info", LitBlockInfo, { extends: "div" });
 
+const literateBtnTemplate = `
+<button title="Literate options">
+	<svg aria-hidden="true" viewBox="0 0 67.733333 67.733334" stroke-width="3.54809" stroke="currentColor" fill="currentColor" stroke-linecap="butt" stroke-linejoin="round">
+		<path style="fill:none" d="M 22.022455,7.2758939 C 20.236913,30.293765 60.886421,32.147289 59.767779,15.820185 59.329234,9.4257407 48.281466,3.3350703 42.527879,22.635036 37.299835,40.172082 24.145493,43.709247 13.533714,42.757932 0.13866865,41.557256 0.20324393,27.149302 6.9501566,25.08928 13.820684,22.991562 20.372308,29.520422 25.149318,44.361387 c 6.394941,19.86776 18.523459,24.743831 27.165621,16.604648 6.719662,-6.32852 6.253443,-15.45748 -0.127732,-21.097386" />
+		<circle style="stroke:none" cx="55.142498" cy="14.859671" r="4.1102643" />
+		<path style="fill:none" d="M 66.876312,8.2790248 H 62.461917 C 58.988759,4.1122728 50.780458,1.4458099 44.559942,7.6510133 H 40.24461" />
+	</svg>
+	<span class="visually-hidden">Literate options</span>
+</button>
+`;
+
 // Inject in Furo theme
 function onDOMContentLoaded() {
-	console.log("onDOMContentLoaded");
 	const style = document.createElement("style");
 	style.textContent = styleVariables;
 	document.head.append(style);
 
-	const x = document.querySelectorAll(".content-icon-container");
-	console.log(x);
+	const containers = document.querySelectorAll(".content-icon-container")
+	for (let i = 0 ; i < containers.length ; ++i) {
+		const literateBtn = document.createElement("div");
+		literateBtn.setAttribute("class", "literate-options");
+		literateBtn.innerHTML = literateBtnTemplate;
+		containers[i].insertBefore(literateBtn, containers[i].children[0]);
+	}
 }
 document.addEventListener('DOMContentLoaded', onDOMContentLoaded, {once: true});
