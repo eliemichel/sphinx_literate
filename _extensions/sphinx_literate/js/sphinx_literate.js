@@ -1,5 +1,12 @@
 // NB: This style has been designed for the Furo theme.
 
+const config = {
+	//begin_ref: "{{\u00a0",
+	//end_ref: "\u00a0}}",
+	begin_ref: "{{",
+	end_ref: "}}",
+};
+
 const commonStyle = `
 a:hover {
 	color: var(--color-link--hover);
@@ -48,9 +55,9 @@ class LitRef extends HTMLSpanElement {
 	connectedCallback() {
 		const shadow = this.attachShadow({ mode: "open" });
 
-		const open = document.createTextNode("{{\u00a0");
+		const open = document.createTextNode(config.begin_ref);
 
-		const close = document.createTextNode("\u00a0}}");
+		const close = document.createTextNode(config.end_ref);
 
 		const link = document.createElement("a");
 		link.textContent = this.getAttribute("name");
@@ -98,9 +105,9 @@ class LitBlockInfo extends HTMLDivElement {
 	}
 
 	createLitLink(name, url, className) {
-		const open = document.createTextNode("{{\u00a0");
+		const open = document.createTextNode(config.begin_ref);
 
-		const close = document.createTextNode("\u00a0}}");
+		const close = document.createTextNode(config.end_ref);
 
 		const link = document.createElement("a");
 		link.textContent = name;

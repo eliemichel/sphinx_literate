@@ -133,34 +133,6 @@ class LiterateNode(nodes.General, nodes.Element):
                     'url': lit.link_url(docname, self.builder),
                 }
 
-            def make_link(lit, class_name=None):
-                url = lit.link_url(docname, self.builder)
-
-                name = lit.name
-                # Whether there are other blocks with the same name in the same tangle root
-                multiple_blocks = (
-                    lit.next is not None or
-                    (lit.prev is not None and lit.prev.tangle_root == lit.tangle_root)
-                )
-                if multiple_blocks:
-                    name += f'#{lit.child_index}'
-
-                if class_name is not None:
-                    begin_span = f'<span class="{class_name}">'
-                    end_span = '</span>'
-                else:
-                    begin_span = end_span = ""
-
-                return (
-                    html.escape(app.config.lit_begin_ref) +
-                    f'&nbsp;<a href="{url}">' +
-                        begin_span +
-                            html.escape(name) +
-                        end_span +
-                    '</a>&nbsp;' +
-                    html.escape(app.config.lit_end_ref)
-                )
-
             metadata = {
                 'name': node.lit.name,
                 'permalink': "#" + node.lit.target['refid'],
@@ -171,46 +143,32 @@ class LiterateNode(nodes.General, nodes.Element):
                 'referenced in': [],
             }
 
-            parent_link = ''
             if node.lit.prev is not None:
-                if node.lit.relation_to_prev == 'REPLACE':
-                    parent_link = ' replacing '
-                elif node.lit.relation_to_prev == 'APPEND':
-                    parent_link = ' completing '
-                else:
-                    assert(False)
-                metadata[parent_link.strip()].append(make_link_metadata(node.lit.prev))
-                parent_link += make_link(node.lit.prev)
+                section = {
+                    'REPLACE': 'replacing',
+                    'APPEND': 'completing',
+                }[node.lit.relation_to_prev]
+                metadata[section].append(
+                    make_link_metadata(node.lit.prev)
+                )
 
-            child_link = ''
             if node.lit.next is not None:
-                if node.lit.next.relation_to_prev == 'REPLACE':
-                    child_link = ' replaced by '
-                elif node.lit.next.relation_to_prev == 'APPEND':
-                    child_link = ' completed in '
-                else:
-                    assert(False)
-                metadata[child_link.strip()].append(make_link_metadata(node.lit.next))
-                child_link += make_link(node.lit.next)
+                section = {
+                    'REPLACE': 'replaced by',
+                    'APPEND': 'completed in',
+                }[node.lit.next.relation_to_prev]
+                metadata[section].append(
+                    make_link_metadata(node.lit.next)
+                )
 
-            ref_links = ''
-            if node.references:
-                ref_links = ' referenced in '
-                for ref in node.references:
-                    ref_links += make_link(ref)
-                    metadata['referenced in'].append(make_link_metadata(ref))
+            for ref in node.references:
+                metadata['referenced in'].append(
+                    make_link_metadata(ref)
+                )
 
-            # Footer
             encoded_metadata = html.escape(json.dumps(metadata))
             self.body.append(
-                f'<lit-block-info data="{encoded_metadata}">' +
-                    '<div class="lit-block-footer">' +
-                        make_link(node.lit, class_name="lit-name") +
-                        parent_link +
-                        child_link +
-                        ref_links +
-                    '</div>' +
-                '</lit-block-info>'
+                f'<lit-block-info data="{encoded_metadata}"></lit-block-info>'
             )
 
             if skip:
