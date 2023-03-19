@@ -10,12 +10,14 @@ from sphinx.errors import ExtensionError
 def _tangle_rec(
     lit: CodeBlock,
     registry: CodeBlockRegistry,
+    override_tangle_root: str,
     begin_ref: str, # config
     end_ref: str, # config
     tangled_content, # return list
-    prefix="" # for recursive use only
+    prefix = "" # for recursive use only
 ) -> None:
     for line in lit.all_content():
+        # TODO: use parse.parse_block_content here?
         subprefix = None
         name = None
         begin_offset = line.find(begin_ref)
@@ -25,17 +27,18 @@ def _tangle_rec(
                 subprefix = line[:begin_offset]
                 name = line[begin_offset+len(begin_ref):end_offset]
         if name is not None:
-            sublit = registry.get_rec(name, lit.tangle_root)
+            sublit = registry.get_rec(name, lit.tangle_root, override_tangle_root=override_tangle_root)
             if lit is None:
                 message = (
                     f"Literate code block not found: '{name}' " +
-                    f"(in tangle directive from document {lit.docname}, " +
-                    f"line {lit.lineno}, tangle root {lit.tangle_root})"
+                    f"(in tangle directive from {lit.source_location.format()}, " +
+                    f"tangle root {lit.tangle_root})"
                 )
                 raise ExtensionError(message, modname="sphinx_literate")
             _tangle_rec(
                 sublit,
                 registry,
+                override_tangle_root,
                 begin_ref,
                 end_ref,
                 tangled_content,
@@ -72,13 +75,13 @@ def tangle(
             f"Literate code block not found: '{block_name}' " +
             f"({error_context}in root '{tangle_root}')"
         )
-        print(list(lit_codeblocks.keys()))
         raise ExtensionError(message, modname="sphinx_literate")
 
     tangled_content = []
     _tangle_rec(
         lit,
         registry,
+        tangle_root,
         config.lit_begin_ref,
         config.lit_end_ref,
         tangled_content,

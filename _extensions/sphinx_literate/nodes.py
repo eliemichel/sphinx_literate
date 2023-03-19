@@ -126,7 +126,12 @@ class LiterateNode(nodes.General, nodes.Element):
                 refid = lit.target['refid']
 
                 name = lit.name
-                if lit.next is not None or lit.prev is not None:
+                # Whether there are other blocks with the same name in the same tangle root
+                multiple_blocks = (
+                    lit.next is not None or
+                    (lit.prev is not None and lit.prev.tangle_root == lit.tangle_root)
+                )
+                if multiple_blocks:
                     name += f'#{lit.child_index}'
 
                 if class_name is not None:
@@ -147,11 +152,23 @@ class LiterateNode(nodes.General, nodes.Element):
 
             parent_link = ''
             if node.lit.prev is not None:
-                parent_link = ' completing ' + make_link(node.lit.prev)
+                if node.lit.relation_to_prev == 'REPLACE':
+                    parent_link = ' replacing '
+                elif node.lit.relation_to_prev == 'APPEND':
+                    parent_link = ' completing '
+                else:
+                    assert(False)
+                parent_link += make_link(node.lit.prev)
 
             child_link = ''
             if node.lit.next is not None:
-                child_link = ' completed in ' + make_link(node.lit.next)
+                if node.lit.next.relation_to_prev == 'REPLACE':
+                    child_link = ' replaced by '
+                elif node.lit.next.relation_to_prev == 'APPEND':
+                    child_link = ' completed in '
+                else:
+                    assert(False)
+                child_link += make_link(node.lit.next)
 
             ref_links = ''
             if node.references:

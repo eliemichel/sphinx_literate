@@ -18,6 +18,11 @@ bar
 {{A block}}
 ```
 
+```{lit} Result block
+{{A block}}
+{{Another block}}
+```
+
 *Document B*
 
 ```{lit-setup}
@@ -29,8 +34,6 @@ bar
 {{A block}}
 {{Another block}}
 ```
-
-Tangled:
 
 ```{tangle} Result block
 ```
@@ -50,7 +53,7 @@ foo
 :parent: versionA
 ```
 
-```{lit} A block (replace)
+```{lit} A block
 new foo
 ```
 
@@ -58,8 +61,6 @@ new foo
 {{A block}}
 {{Another block}}
 ```
-
-Tangled:
 
 ```{tangle} Result block
 ```
@@ -83,13 +84,6 @@ foo
 more foo
 ```
 
-```{lit} Result block
-{{A block}}
-{{Another block}}
-```
-
-Tangled:
-
 ```{tangle} Result block
 ```
 
@@ -100,4 +94,81 @@ foo
 more foo
 bar
 foo
+more foo
 ```
+
+Inherit from grand-parents
+--------------------------
+
+### Grand-parent
+
+```{lit-setup}
+:tangle-root: grand-parent
+```
+
+```{lit} Some foo
+grand-parent's foo
+```
+
+```{lit} Some bar
+grand-parent's bar
+```
+
+```{lit} Some baz
+grand-parent's baz
+```
+
+```{lit} Result
+{{Some foo}}
+{{Some bar}}
+{{Some baz}}
+```
+
+```{tangle} Result
+```
+
+### Parent
+
+```{lit-setup}
+:tangle-root: parent
+:parent: grand-parent
+```
+
+```{lit} Some bar
+parent's bar
+```
+
+```{tangle} Result
+```
+
+### Child
+
+```{lit-setup}
+:tangle-root: child
+:parent: parent
+```
+
+```{lit} Some foo (replace)
+child's foo
+```
+
+```{lit} Some bar (replace)
+child's bar (replaces the parent but not affecting the grand-parent)
+```
+
+```{lit} Some baz (append)
+child's baz
+```
+
+```{tangle} Result
+```
+
+*Expected*
+
+```
+child's foo
+grand-parent's bar
+grand-parent's baz
+child's baz
+```
+

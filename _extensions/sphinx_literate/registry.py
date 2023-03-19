@@ -293,19 +293,40 @@ class CodeBlockRegistry:
     def get(self, name: str, tangle_root: str | None = None) -> CodeBlock:
         return self.get_by_key(CodeBlock.build_key(name, tangle_root))
 
-    def get_rec(self, name: str, tangle_root: str | None = None) -> CodeBlock:
+    def get_rec(self, name: str, tangle_root: str | None, override_tangle_root: str | None = None) -> CodeBlock:
         """
-        Get a block an drecursively search for it in parent tangles
+        Get a block and recursively search for it in parent tangles
+        If a root override is provided, first look there for a block that has
+        a 'REPLACE' or 'APPEND' relation.
         """
-        existing = self.get(name, tangle_root)
-        if existing is not None:
-            return existing
-        hierarchy = self._hierarchy.get(tangle_root)
-        while hierarchy is not None:
-            existing = self.get(name, hierarchy.parent)
-            if existing is not None:
-                return existing
-            hierarchy = self._hierarchy.get(hierarchy.parent)
+
+        # Explore downstream parent tree towards the 'override' root.
+        # From this chain of blocks, we keep the one that is just before the
+        # first 'NEW' (beyond chich blocks with the same names are not
+        # overrides, they are unrelated).
+        found = None
+        tr = override_tangle_root
+        while tr is not None and tr != tangle_root:
+            lit = self.get(name, tr)
+            if lit is not None:
+                if lit.relation_to_prev == 'NEW':
+                    found = None # reset
+                elif found is None:
+                    found = lit
+            tr = self._parent_tangle_root(tr)
+
+        if found is not None:
+            return found
+
+        # In upstream tangle tree, return the first match
+        prev_tr = ()
+        tr = tangle_root
+        while tr != prev_tr:
+            found = self.get(name, tr)
+            if found is not None:
+                return found
+            prev_tr = tr
+            tr = self._parent_tangle_root(tr)
         return None
 
     def get_by_key(self, key: Key) -> CodeBlock:
@@ -323,3 +344,7 @@ class CodeBlockRegistry:
 
     def references_to_key(self, key: Key) -> List[Key]:
         return list(self._references[key])
+
+    def _parent_tangle_root(self, tangle_root: str) -> str | None:
+        h = self._hierarchy.get(tangle_root)
+        return h.parent if h is not None else None
