@@ -9,27 +9,36 @@ const config = {
 };
 
 // Options tunable by the user
-function initOptions() {
-	localStorage.setItem("showReferenceDetails", true);
+class Options {
+	constructor() {
+		this.changedEvent = new Event("litOptionsChanged");
+
+		this.defaultOptions = {
+			showBlockName: false,
+			showReferenceDetails: false,
+			showReferenceAsComment: true,
+		}
+
+		for (const [key, value] of Object.entries(this.defaultOptions)) {
+			if (localStorage.getItem(key) === null) {
+				console.log("Initializing option " + key);
+				localStorage.setItem(key, JSON.stringify(value));
+			} else {
+				console.log("Loaded option " + key + ": " + JSON.parse(localStorage.getItem(key)));
+			}
+		}
+	}
+
+	get(key) {
+		return JSON.parse(localStorage.getItem(key));
+	}
+
+	set(key, value) {
+		localStorage.setItem(key, JSON.stringify(value));
+		document.dispatchEvent(this.changedEvent);
+	}
 }
-function getOption(key) {
-	const boolean = (x) => x === "true";
-	const cast = {
-		showReferenceDetails: boolean,
-	}[key];
-	return cast(localStorage.getItem(key));
-}
-const litOptionsChangedEvent = new Event("litOptionsChanged");
-function setOption(key, value) {
-	localStorage.setItem(key, value);
-	document.dispatchEvent(litOptionsChangedEvent);
-}
-if (localStorage.getItem("showReferenceDetails") === undefined) {
-	console.log("init options");
-	initOptions();
-} else {
-	console.log("loaded options: showReferenceDetails = " + getOption("showReferenceDetails"));
-}
+const options = new Options();
 
 const lightStyleVariables = `
 --color-background-lit-info: #d5eca8;
@@ -94,6 +103,11 @@ a {
 `;
 
 const litRefStyle = `
+.comment {
+	/* from pygment */
+	color: #75715e;
+	font-style: italic;
+}
 `;
 
 const litBlockInfoStyle = `
@@ -123,18 +137,36 @@ class LitRef extends HTMLSpanElement {
 	connectedCallback() {
 		const shadow = this.attachShadow({ mode: "open" });
 
-		const open = document.createTextNode(config.begin_ref);
+		this.styleElement = document.createElement("style");
+		this.styleElement.textContent = commonStyle + litRefStyle;
 
-		const close = document.createTextNode(config.end_ref);
+		this.rebuildShadow();
 
-		const link = document.createElement("a");
-		link.textContent = this.getAttribute("name");
-		link.href = this.getAttribute("href");
+		// Callbacks
+		document.addEventListener(options.changedEvent.type, (function() {
+			this.rebuildShadow();
+		}).bind(this));
+	}
 
-		const style = document.createElement("style");
-		style.textContent = commonStyle + litRefStyle;
+	rebuildShadow() {
+		if (options.get('showReferenceAsComment')) {
+			// TODO: comment depends on language... (must be given by sphinx build)
+			const comment = document.createElement("span");
+			comment.textContent = "// [...] " + this.getAttribute("name");
+			comment.setAttribute("class", "comment");
 
-		shadow.append(style, open, link, close);
+			this.shadowRoot.replaceChildren(this.styleElement, comment);
+		} else {
+			const open = document.createTextNode(config.begin_ref);
+
+			const close = document.createTextNode(config.end_ref);
+
+			const link = document.createElement("a");
+			link.textContent = this.getAttribute("name");
+			link.href = this.getAttribute("href");
+
+			this.shadowRoot.replaceChildren(this.styleElement, open, link, close);
+		}
 	}
 }
 
@@ -147,10 +179,14 @@ class LitBlockInfo extends HTMLDivElement {
 
 	connectedCallback() {
 		this.attachShadow({ mode: "open" });
+
+		this.styleElement = document.createElement("style");
+		this.styleElement.textContent = commonStyle + litBlockInfoStyle;
+
 		this.rebuildShadow();
 
 		// Callbacks
-		document.addEventListener(litOptionsChangedEvent.type, (function() {
+		document.addEventListener(options.changedEvent.type, (function() {
 			this.rebuildShadow();
 		}).bind(this));
 	}
@@ -162,9 +198,11 @@ class LitBlockInfo extends HTMLDivElement {
 		wrapper.setAttribute("class", "wrapper");
 		wrapper.setAttribute("data-theme", "dark");
 
-		wrapper.append(...this.createLitLink(data.name, data.permalink, "lit-name"));
+		if (options.get('showBlockName')) {
+			wrapper.append(...this.createLitLink(data.name, data.permalink, "lit-name"));
+		}
 
-		if (getOption('showReferenceDetails')) {
+		if (options.get('showReferenceDetails')) {
 			const details = ['replaced by', 'completed in', 'completing', 'replacing', 'referenced in'];
 			details.map(section => {
 				if (data[section].length > 0) {
@@ -176,10 +214,7 @@ class LitBlockInfo extends HTMLDivElement {
 			});
 		}
 
-		const style = document.createElement("style");
-		style.textContent = commonStyle + litBlockInfoStyle;
-
-		this.shadowRoot.replaceChildren(style, wrapper);
+		this.shadowRoot.replaceChildren(this.styleElement, wrapper);
 	}
 
 	createLitLink(name, url, className) {
@@ -230,11 +265,17 @@ function onDOMContentLoaded() {
 	*/
 
 	// Connect elements to literate options
-	const input = document.getElementById("lit-opts-show-reference-details");
-	if (input !== null) {
-		input.checked = getOption('showReferenceDetails');
+	const checkboxIdToOption = {
+		"lit-opts-show-block-name": "showBlockName",
+		"lit-opts-show-reference-details": "showReferenceDetails",
+		"lit-opts-show-reference-as-comment": "showReferenceAsComment",
+	}
+	for (const [id, opt] of Object.entries(checkboxIdToOption)) {
+		const input = document.getElementById(id);
+		if (input === null) continue;
+		input.checked = options.get(opt);
 		input.addEventListener('click', function(e) {
-			setOption('showReferenceDetails', input.checked);
+			options.set(opt, input.checked);
 		});
 	}
 }
