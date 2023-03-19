@@ -1,6 +1,7 @@
 from docutils import nodes
 
 import html
+import json
 
 from .registry import Key, CodeBlock, SourceLocation
 
@@ -126,8 +127,13 @@ class LiterateNode(nodes.General, nodes.Element):
 
             docname = node.lit.source_location.docname
 
+            def make_link_metadata(lit):
+                return {
+                    'name': lit.name,
+                    'url': lit.link_url(docname, self.builder),
+                }
+
             def make_link(lit, class_name=None):
-                refid = lit.target['refid']
                 url = lit.link_url(docname, self.builder)
 
                 name = lit.name
@@ -155,6 +161,16 @@ class LiterateNode(nodes.General, nodes.Element):
                     html.escape(app.config.lit_end_ref)
                 )
 
+            metadata = {
+                'name': node.lit.name,
+                'permalink': "#" + node.lit.target['refid'],
+                'replaced by': [],
+                'completed in': [],
+                'completing': [],
+                'replacing': [],
+                'referenced in': [],
+            }
+
             parent_link = ''
             if node.lit.prev is not None:
                 if node.lit.relation_to_prev == 'REPLACE':
@@ -163,6 +179,7 @@ class LiterateNode(nodes.General, nodes.Element):
                     parent_link = ' completing '
                 else:
                     assert(False)
+                metadata[parent_link.strip()].append(make_link_metadata(node.lit.prev))
                 parent_link += make_link(node.lit.prev)
 
             child_link = ''
@@ -173,6 +190,7 @@ class LiterateNode(nodes.General, nodes.Element):
                     child_link = ' completed in '
                 else:
                     assert(False)
+                metadata[child_link.strip()].append(make_link_metadata(node.lit.next))
                 child_link += make_link(node.lit.next)
 
             ref_links = ''
@@ -180,11 +198,12 @@ class LiterateNode(nodes.General, nodes.Element):
                 ref_links = ' referenced in '
                 for ref in node.references:
                     ref_links += make_link(ref)
+                    metadata['referenced in'].append(make_link_metadata(ref))
 
             # Footer
-            lit_id = node.lit.target['refid']
+            encoded_metadata = html.escape(json.dumps(metadata))
             self.body.append(
-                f'<lit-block-info name="{node.lit.name}" permalink="#{lit_id}">' +
+                f'<lit-block-info data="{encoded_metadata}">' +
                     '<div class="lit-block-footer">' +
                         make_link(node.lit, class_name="lit-name") +
                         parent_link +

@@ -1,5 +1,6 @@
+// NB: This style has been designed for the Furo theme.
 
-const litRefStyle = `
+const commonStyle = `
 a:hover {
 	color: var(--color-link--hover);
 	-webkit-text-decoration-color: var(--color-link-underline--hover);
@@ -14,6 +15,28 @@ a {
 }
 a {
 	background-color: transparent;
+}
+`;
+
+const litRefStyle = `
+`;
+
+const litBlockInfoStyle = `
+.wrapper {
+	text-align: right;
+	font-size: 0.8em;
+	position: absolute;
+	bottom: -0.7em;
+	right: 0.5em;
+	margin-top: 0;
+	color: rgba(0, 0, 0, 0.39);
+	background-color: #3e3d35;
+	border-radius: 0.3em;
+	padding: 0 0.3em;
+}
+
+.wrapper a.lit-name {
+	color: rgba(0, 0, 0, 0.94);
 }
 `;
 
@@ -34,11 +57,13 @@ class LitRef extends HTMLSpanElement {
 		link.href = this.getAttribute("href");
 
 		const style = document.createElement("style");
-		style.textContent = litRefStyle;
+		style.textContent = commonStyle + litRefStyle;
 
 		shadow.append(style, open, link, close);
 	}
 }
+
+customElements.define("lit-ref", LitRef, { extends: "span" });
 
 class LitBlockInfo extends HTMLDivElement {
 	constructor() {
@@ -46,25 +71,47 @@ class LitBlockInfo extends HTMLDivElement {
 	}
 
 	connectedCallback() {
+		const data = JSON.parse(this.getAttribute("data"));
 		const shadow = this.attachShadow({ mode: "open" });
 
+		console.log(data);
+
+		const wrapper = document.createElement("div");
+		wrapper.setAttribute("class", "wrapper");
+
+		wrapper.append(...this.createLitLink(data.name, data.permalink, "lit-name"));
+
+		const details = ['replaced by', 'completed in', 'completing', 'replacing', 'referenced in'];
+		details.map(section => {
+			if (data[section].length > 0) {
+				wrapper.append(document.createTextNode(" " + section + " "));
+				data[section].map(lit => {
+					wrapper.append(...this.createLitLink(lit.name, lit.url));
+				});
+			}
+		});
+
+		const style = document.createElement("style");
+		style.textContent = commonStyle + litBlockInfoStyle;
+
+		shadow.append(style, wrapper);
+	}
+
+	createLitLink(name, url, className) {
 		const open = document.createTextNode("{{\u00a0");
 
 		const close = document.createTextNode("\u00a0}}");
 
 		const link = document.createElement("a");
-		link.textContent = this.getAttribute("name");
-		link.href = this.getAttribute("permalink");
+		link.textContent = name;
+		link.href = url;
+		if (className !== undefined) {
+			link.setAttribute("class", className);
+		}
 
-		const style = document.createElement("style");
-		style.textContent = litRefStyle;
-
-		shadow.append(style, open, link, close);
+		return [open, link, close];
 	}
 }
-
-
-customElements.define("lit-ref", LitRef, { extends: "span" });
 
 customElements.define("lit-block-info", LitBlockInfo, { extends: "div" });
 
