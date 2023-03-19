@@ -95,9 +95,11 @@ class LiterateNode(nodes.General, nodes.Element):
             """
             url = lit.link_url(node.lit.source_location.docname, app.builder)
             return (
-                app.config.lit_begin_ref +
-                f'<a href="{url}">{lit.name}</a>' +
-                app.config.lit_end_ref
+                f'<lit-ref name="{lit.name}" href="{url}">' +
+                    app.config.lit_begin_ref +
+                        f'<a href="{url}">{lit.name}</a>' +
+                    app.config.lit_end_ref +
+                '</lit-ref>'
             )
 
         def visit_html(self, node):
@@ -182,12 +184,14 @@ class LiterateNode(nodes.General, nodes.Element):
             # Footer
             lit_id = node.lit.target['refid']
             self.body.append(
-                '<div class="lit-block-footer">' +
-                    make_link(node.lit, class_name="lit-name") +
-                    parent_link +
-                    child_link +
-                    ref_links +
-                '</div>'
+                f'<lit-block-info name="{node.lit.name}" permalink="#{lit_id}">' +
+                    '<div class="lit-block-footer">' +
+                        make_link(node.lit, class_name="lit-name") +
+                        parent_link +
+                        child_link +
+                        ref_links +
+                    '</div>' +
+                '</lit-block-info>'
             )
 
             if skip:

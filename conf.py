@@ -146,3 +146,4 @@ favicons = [
 
 lit_begin_ref = "{{"
 lit_end_ref = "}}"
+lit_use_default_style = True

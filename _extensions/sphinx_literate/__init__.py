@@ -51,6 +51,7 @@ import sphinx
 from sphinx.locale import _
 from sphinx.util.docutils import SphinxDirective
 from sphinx.errors import ExtensionError
+from sphinx.util.fileutil import copy_asset_file
 
 from dataclasses import dataclass
 from copy import deepcopy
@@ -126,6 +127,19 @@ def process_literate_nodes(app, doctree, fromdocname):
 
         tangle_node.replace_self([para, block_node])
 
+def copy_custom_files(app, exc):
+    if app.config.lit_use_default_style:
+        asset_files = [
+            "js/sphinx_literate.js",
+        ]
+    else:
+        asset_files = []
+    if app.builder.format == 'html' and not exc:
+        staticdir = os.path.join(app.builder.outdir, '_static')
+        root = os.path.dirname(__file__)
+        for path in asset_files:
+            copy_asset_file(os.path.join(root, path), staticdir)
+
 #############################################################
 # Setup
 
@@ -139,8 +153,11 @@ def setup(app):
     app.connect('doctree-resolved', process_literate_nodes)
     app.connect('env-purge-doc', purge_lit_codeblocks)
     app.connect('env-merge-info', merge_lit_codeblocks)
+    app.connect('build-finished', copy_custom_files)
 
     app.add_builder(TangleBuilder)
+
+    app.add_js_file("sphinx_literate.js")
 
     return {
         'version': '0.2',
