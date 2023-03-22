@@ -42,118 +42,25 @@ content must be saved, relative to the root tangle directory.
 
 """
 
-from docutils import nodes
-from docutils.parsers import rst
-from docutils.parsers.rst import Directive
-from docutils.statemachine import StringList, State, StateMachine
-
-import sphinx
-from sphinx.locale import _
-from sphinx.util.docutils import SphinxDirective
-from sphinx.errors import ExtensionError
-from sphinx.util.fileutil import copy_asset_file
-
-from dataclasses import dataclass
-from copy import deepcopy
-import re
-import random
-import os
+from sphinx.application import Sphinx
 
 from .builder import TangleBuilder
-from .registry import CodeBlock, CodeBlockRegistry
-from .tangle import tangle
 from .directives import setup as setup_directives
 from .config import setup as setup_config
 from .nodes import setup as setup_nodes
-from .nodes import LiterateNode, TangleNode
-
-from docutils import nodes
-
-####################################################
-
-def purge_lit_codeblocks(app, env, docname):
-    lit_codeblocks = CodeBlockRegistry.from_env(env)
-    lit_codeblocks.remove_codeblocks_by_docname(docname)
-
-def merge_lit_codeblocks(app, env, docnames, other):
-    lit_codeblocks = CodeBlockRegistry.from_env(env)
-    lit_codeblocks.merge(CodeBlockRegistry.from_env(other))
-
-def process_literate_nodes(app, doctree, fromdocname):
-    lit_codeblocks = CodeBlockRegistry.from_env(app.builder.env)
-
-    for literate_node in doctree.findall(LiterateNode):
-        literate_node.uid_to_lit = {
-            h: lit_codeblocks.get_rec_by_key(key)
-            for h, key in literate_node.uid_to_block_key.items()
-        }
-        literate_node.references = [
-            lit_codeblocks.get_by_key(k)
-            for k in lit_codeblocks.references_to_key(literate_node.lit.key)
-        ]
-
-    for tangle_node in doctree.findall(TangleNode):
-
-        tangled_content, lit = tangle(
-            tangle_node.block_name,
-            tangle_node.tangle_root,
-            lit_codeblocks,
-            app.config,
-            f"in tangle directive from {tangle_node.source_location.format()}, "
-        )
-
-        para = nodes.paragraph()
-        para += nodes.Text(f"Tangled block '{lit.name}' [from ")
-
-        refnode = nodes.reference('', '')
-        refnode['refdocname'] = lit.source_location.docname
-        refnode['refuri'] = lit.link_url(fromdocname, app.builder)
-        refnode.append(nodes.emphasis(_('here'), _('here')))
-        para += refnode
-        
-        para += nodes.Text("]")
-
-        lexer = tangle_node.lexer
-        if lexer is None:
-            lexer = lit.lexer
-
-        block_node = tangle_node.raw_block_node
-        block_node.args = [lexer] if lexer is not None else []
-        block_node.rawsource = '\n'.join(tangled_content)
-        if lexer is not None:
-            block_node['language'] = lexer
-        block_node.children.clear()
-        block_node.children.append(nodes.Text(block_node.rawsource))
-
-        tangle_node.replace_self([para, block_node])
-
-def copy_custom_files(app, exc):
-    if app.config.lit_use_default_style:
-        asset_files = [
-            "js/sphinx_literate.js",
-        ]
-    else:
-        asset_files = []
-    if app.builder.format == 'html' and not exc:
-        staticdir = os.path.join(app.builder.outdir, '_static')
-        root = os.path.dirname(__file__)
-        for path in asset_files:
-            copy_asset_file(os.path.join(root, path), staticdir)
+from .handlers import setup as setup_handlers
 
 #############################################################
 # Setup
 
-def setup(app):
+def setup(app: Sphinx):
     setup_config(app)
 
     setup_nodes(app)
 
     setup_directives(app)
 
-    app.connect('doctree-resolved', process_literate_nodes)
-    app.connect('env-purge-doc', purge_lit_codeblocks)
-    app.connect('env-merge-info', merge_lit_codeblocks)
-    app.connect('build-finished', copy_custom_files)
+    setup_handlers(app)
 
     app.add_builder(TangleBuilder)
 

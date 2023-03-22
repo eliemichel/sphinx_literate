@@ -12,6 +12,7 @@
 			{{ toc }}
 		</div>
 	</div>
+	{% if lit_show_options %}
 	<div class="toc-title-container">
 		<span class="toc-title">
 			{{ _("Literate options") }}
@@ -22,5 +23,6 @@
 			{% include "literate-options.html" %}
 		</div>
 	</div>
+	{% endif %}
 </div>
 {%- endblock %}
