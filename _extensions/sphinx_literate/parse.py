@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import random
 import re
 
-from .registry import CodeBlock
+from .registry import CodeBlock, Key
 
 from sphinx.errors import ExtensionError
 
@@ -30,7 +30,7 @@ class ParsedBlockTitle:
     # Name of the language lexer
     lexer: str | None = None
 
-    # Possible options are 'APPEND'
+    # Possible options are 'APPEND' and 'REPLACE'
     options: Set[str] = field(default_factory=list)
 
 #############################################################
@@ -77,6 +77,18 @@ def parse_block_title(raw_title: str) -> ParsedBlockTitle:
 Uid = str
 
 @dataclass
+class BlockLink:
+    """
+    Link to a literate block
+    """
+
+    # Name of the referenced block
+    key: Key = ""
+
+    # Possible options are 'HIDDEN'
+    options: Set[str] = field(default_factory=list)
+
+@dataclass
 class ParsedBlockContent:
     """
     The content of each literate block is parsed and references are replaced
@@ -89,7 +101,7 @@ class ParsedBlockContent:
 
     # Holds the mapping from the uids and the original references to other
     # literate code blocks.
-    uid_to_block_key: Dict[Uid,str]
+    uid_to_block_link: Dict[Uid,BlockLink]
 
 #############################################################
 
@@ -97,6 +109,29 @@ def generate_uid() -> Uid:
     return "_" + "".join([random.choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") for _ in range(32)])
 
 #############################################################
+
+def parse_block_link(content: str, tangle_root: str | None) -> BlockLink:
+    m = re.match(r"(?P<name>[^(,]*)(?P<options>\(.*\))?", content)
+
+    if m is None:
+        message = f"Invalid block link: '{content}'"
+        raise ExtensionError(message, modname="sphinx_literate")
+
+    name = m.group("name").strip()
+
+    options = m.group("options")
+    if options is None:
+        options = set()
+    else:
+        options = {
+            opt.strip().upper()
+            for opt in options[1:-1].split(',')
+        }
+
+    return BlockLink(
+        key = CodeBlock.build_key(name, tangle_root),
+        options = options,
+    )
 
 def parse_block_content(content: List[str], tangle_root: str | None, config) -> ParsedBlockContent:
     """
@@ -112,7 +147,7 @@ def parse_block_content(content: List[str], tangle_root: str | None, config) -> 
     """
     parsed = ParsedBlockContent(
         content = [],
-        uid_to_block_key = {},
+        uid_to_block_link = {},
     )
 
     raw_source = '\n'.join(content)
@@ -132,7 +167,7 @@ def parse_block_content(content: List[str], tangle_root: str | None, config) -> 
             break
         uid = generate_uid()
         block_name = raw_source[begin_offset+len(begin_ref):end_offset]
-        parsed.uid_to_block_key[uid] = CodeBlock.build_key(block_name, tangle_root)
+        parsed.uid_to_block_link[uid] = parse_block_link(block_name, tangle_root)
         parsed_source += raw_source[offset:begin_offset]
         parsed_source += uid
         offset = end_offset + len(end_ref)

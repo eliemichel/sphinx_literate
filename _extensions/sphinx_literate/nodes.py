@@ -35,8 +35,8 @@ class LiterateHighlighter:
         highlighted = self._original_highlighter.highlight_block(rawsource, lang, **kwargs)
 
         # Post-process: Replace hashes with links
-        for uid, lit in self.node.uid_to_lit.items():
-            ref = self.ref_factory(self.node, lit)
+        for uid, (lit, options) in self.node.uid_to_lit.items():
+            ref = self.ref_factory(self.node, lit, options)
             highlighted = highlighted.replace(uid, ref)
 
         return highlighted
@@ -49,7 +49,7 @@ class LiterateNode(nodes.General, nodes.Element):
         We wrap a literal node and insert links to references code blocks
         """
         self._literal_node = literal_node
-        self.uid_to_block_key = {}
+        self.uid_to_block_link = {}
         self.uid_to_lit = {}
         self.lit = lit
         self.references: List[CodeBlock] = []
@@ -83,7 +83,7 @@ class LiterateNode(nodes.General, nodes.Element):
 
         inherited_html_visit, inherited_html_depart = literal_block_handlers.get('html', (None, None))
 
-        def create_ref(node, lit):
+        def create_ref(node, lit, options):
             """
             # TODO: Could this be a way to make that protable to all builders?
             refnode = nodes.reference('', '')
@@ -95,9 +95,10 @@ class LiterateNode(nodes.General, nodes.Element):
             refnode.append(nodes.Text(lit.name))
             """
             url = lit.link_url(node.lit.source_location.docname, app.builder)
-            lexer = f'"{lit.lexer}"' if lit.lexer is not None else "null";
+            lexer = f'"{lit.lexer}"' if lit.lexer is not None else "null"
+            hidden = "true" if 'HIDDEN' in options else "false"
             return (
-                f'<lit-ref name="{lit.name}" href="{url}" lexer={lexer}>' +
+                f'<lit-ref name="{lit.name}" href="{url}" lexer={lexer} hidden="{hidden}">' +
                     app.config.lit_begin_ref +
                         f'<a href="{url}">{lit.name}</a>' +
                     app.config.lit_end_ref +

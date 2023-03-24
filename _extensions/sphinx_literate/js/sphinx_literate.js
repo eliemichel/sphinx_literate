@@ -17,6 +17,7 @@ class Options {
 			showBlockName: false,
 			showReferenceDetails: false,
 			showReferenceLinks: false,
+			showHiddenLinks: false,
 		}
 
 		for (const [key, value] of Object.entries(this.defaultOptions)) {
@@ -151,12 +152,49 @@ function buildComment(content, lexer) {
 	}
 }
 
+/**
+ * Wrap the line that contains the element in a span with the given class name.
+ * TODO: avoid wrapping extra new lines when lines are empty (split text nodes)
+ */
+function createLineWrapper(element, className) {
+	const parentPre = element.closest("pre");
+
+	let parent = element.parentNode;
+	let container = element;
+	while (parent != parentPre) {
+		container = parent;
+		parent = parent.parentNode;
+	}
+
+	const containerIndex = [].indexOf.call(parentPre.childNodes, container);
+
+	const elementsOnSameLine = [container];
+	for (let i = containerIndex + 1 ; i < parentPre.childNodes.length ; ++i) {
+		const node = parentPre.childNodes[i];
+		elementsOnSameLine.push(node);
+		if (node.nodeType === Node.TEXT_NODE && node.nodeValue.indexOf("\n") != -1) {
+			break;
+		}
+	}
+	for (let i = containerIndex - 1 ; i >= 0 ; --i) {
+		const node = parentPre.childNodes[i];
+		if (node.nodeType === Node.TEXT_NODE && node.nodeValue.indexOf("\n") != -1) {
+			break;
+		}
+		elementsOnSameLine.unshift(node);
+	}
+
+	lineWrapper = document.createElement('span');
+	lineWrapper.setAttribute("class", className);
+	parentPre.insertBefore(lineWrapper, elementsOnSameLine[0]);
+	lineWrapper.append(...elementsOnSameLine);
+	return lineWrapper;
+}
+
 class LitRef extends HTMLElement {
 	constructor() {
 		super();
-	}
 
-	connectedCallback() {
 		const shadow = this.attachShadow({ mode: "open" });
 
 		this.styleElement = document.createElement("style");
@@ -171,6 +209,21 @@ class LitRef extends HTMLElement {
 	}
 
 	rebuildShadow() {
+		const hidden = this.getAttribute("hidden") === "true" && !options.get('showHiddenLinks');
+		if (hidden) {
+			let lineWrapper = this.closest(".lit-line-wrapper");
+			if (lineWrapper === null) {
+				lineWrapper = createLineWrapper(this, ".lit-line-wrapper");
+			}
+			lineWrapper.setAttribute("style", "display: none;");
+			this.shadowRoot.replaceChildren();
+		} else {
+			let lineWrapper = this.closest(".lit-line-wrapper");
+			if (lineWrapper !== null) {
+				lineWrapper.setAttribute("style", "");
+			}
+		}
+
 		if (options.get('showReferenceLinks')) {
 			const open = document.createTextNode(config.begin_ref);
 
@@ -201,9 +254,7 @@ customElements.define("lit-ref", LitRef);
 class LitBlockInfo extends HTMLElement {
 	constructor() {
 		super();
-	}
 
-	connectedCallback() {
 		this.attachShadow({ mode: "open" });
 
 		this.styleElement = document.createElement("style");

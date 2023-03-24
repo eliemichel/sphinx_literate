@@ -33,8 +33,8 @@ def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
     for literate_node in doctree.findall(LiterateNode):
         has_literate_node = True
         literate_node.uid_to_lit = {
-            h: registry.get_rec_by_key(key)
-            for h, key in literate_node.uid_to_block_key.items()
+            h: (registry.get_rec_by_key(link.key), link.options)
+            for h, link in literate_node.uid_to_block_link.items()
         }
         literate_node.references = [
             registry.get_by_key(k)

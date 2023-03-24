@@ -122,8 +122,8 @@ class LiterateDirective(SphinxCodeBlock):
         else:
             lit_codeblocks.add_codeblock(self.lit)
 
-        for ref in self.parsed_content.uid_to_block_key.values():
-            lit_codeblocks.add_reference(self.lit.key, ref)
+        for ref in self.parsed_content.uid_to_block_link.values():
+            lit_codeblocks.add_reference(self.lit.key, ref.key)
 
         # Call parent for generating a regular code block
         self.content = StringList(self.parsed_content.content)
@@ -161,7 +161,7 @@ class LiterateDirective(SphinxCodeBlock):
         about what reference links to insert during the final translation.
         """
         literate_node = LiterateNode(raw_literal_node, self.lit)
-        literate_node.uid_to_block_key = self.parsed_content.uid_to_block_key
+        literate_node.uid_to_block_link = self.parsed_content.uid_to_block_link
         return literate_node
 
 #############################################################
