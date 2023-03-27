@@ -211,6 +211,7 @@ class LitRef extends HTMLElement {
 	rebuildShadow() {
 		const hidden = this.getAttribute("hidden") === "true" && !options.get('showHiddenLinks');
 		if (hidden) {
+			console.log("hidden")
 			let lineWrapper = this.closest(".lit-line-wrapper");
 			if (lineWrapper === null) {
 				lineWrapper = createLineWrapper(this, ".lit-line-wrapper");
@@ -346,6 +347,7 @@ function onDOMContentLoaded() {
 		"lit-opts-show-block-name": "showBlockName",
 		"lit-opts-show-reference-details": "showReferenceDetails",
 		"lit-opts-show-reference-links": "showReferenceLinks",
+		"lit-opts-show-hidden-links": "showHiddenLinks",
 	}
 	for (const [id, opt] of Object.entries(checkboxIdToOption)) {
 		const input = document.getElementById(id);

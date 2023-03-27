@@ -343,9 +343,9 @@ class CodeBlockRegistry:
     def get_by_key(self, key: Key) -> CodeBlock:
         return self._blocks.get(key)
 
-    def get_rec_by_key(self, key: Key) -> CodeBlock:
+    def get_rec_by_key(self, key: Key, override_tangle_root: str | None = None) -> CodeBlock:
         tangle_root, name = key.split("##")
-        return self.get_rec(name, tangle_root)
+        return self.get_rec(name, tangle_root, override_tangle_root)
 
     def keys(self) -> dict_keys:
         return self._blocks.keys()

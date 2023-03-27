@@ -8,7 +8,7 @@ This is a test for the literate programming sphinx extension developped for this
 
 ```{lit} C++, file: src/main.cpp
 #include <iostream>
-{{Includes}}
+{{Includes (hidden)}}
 
 int main(int, char**) {
     {{Main content}}
