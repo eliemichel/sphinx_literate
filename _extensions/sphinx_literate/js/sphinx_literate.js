@@ -209,15 +209,13 @@ class LitRef extends HTMLElement {
 	}
 
 	rebuildShadow() {
-		const hidden = this.getAttribute("hidden") === "true" && !options.get('showHiddenLinks');
+		const hidden = this.getAttribute("hidden-link") === "true" && !options.get('showHiddenLinks');
 		if (hidden) {
-			console.log("hidden")
 			let lineWrapper = this.closest(".lit-line-wrapper");
 			if (lineWrapper === null) {
-				lineWrapper = createLineWrapper(this, ".lit-line-wrapper");
+				lineWrapper = createLineWrapper(this, "lit-line-wrapper");
 			}
 			lineWrapper.setAttribute("style", "display: none;");
-			this.shadowRoot.replaceChildren();
 		} else {
 			let lineWrapper = this.closest(".lit-line-wrapper");
 			if (lineWrapper !== null) {

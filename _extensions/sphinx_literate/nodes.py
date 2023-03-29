@@ -98,7 +98,7 @@ class LiterateNode(nodes.General, nodes.Element):
             lexer = f'"{lit.lexer}"' if lit.lexer is not None else "null"
             hidden = "true" if 'HIDDEN' in options else "false"
             return (
-                f'<lit-ref name="{lit.name}" href="{url}" lexer={lexer} hidden="{hidden}">' +
+                f'<lit-ref name="{lit.name}" href="{url}" lexer={lexer} hidden-link="{hidden}">' +
                     app.config.lit_begin_ref +
                         f'<a href="{url}">{lit.name}</a>' +
                     app.config.lit_end_ref +
