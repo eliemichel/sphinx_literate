@@ -156,6 +156,16 @@ class TangleHierarchyEntry:
 #############################################################
 # Codeblock registry
 
+@dataclass
+class MissingCodeBlock:
+    """
+    We allow missing blocks to enable parallel compilation. Missing
+    blocks are resolved when combining multiple registers comming from
+    parallel units.
+    """
+    key: Key
+    relation_to_prev: str
+
 class CodeBlockRegistry:
     """
     Holds the various code blocks and prevents duplicates.
@@ -181,6 +191,11 @@ class CodeBlockRegistry:
         # Holds the relationship between different tangle roots.
         # This maps a root to its parent
         self._hierarchy: Dict[str,TangleHierarchyEntry] = {}
+
+        # We allow missing blocks to enable parallel compilation. Missing
+        # blocks are resolved when combining multiple registers comming from
+        # parallel units.
+        self._missing: List[MissingCodeBlock] = []
 
     def add_codeblock(self, lit: CodeBlock) -> None:
         """
@@ -229,9 +244,12 @@ class CodeBlockRegistry:
         """
         Shared behavior between append_codeblock() and replace_codeblock()
         """
+        lit.relation_to_prev = relation_to_prev
+
         existing = self.get_rec(lit.name, lit.tangle_root)
 
         if existing is None:
+            """
             action_str = {
                 'APPEND': "append to",
                 'REPLACE': "replace",
@@ -241,10 +259,16 @@ class CodeBlockRegistry:
                 f"  - In {lit.source_location.format()}.\n"
             )
             raise ExtensionError(message, modname="sphinx_literate")
-
-        lit.relation_to_prev = relation_to_prev
-        
-        if existing.tangle_root != lit.tangle_root:
+            """
+            self._missing.append(
+                MissingCodeBlock(lit.key, relation_to_prev)
+            )
+            # Add to the list of block with no parent, even though the
+            # relation_to_prev is not NEW. This will be addressed when
+            # resolving missings.
+            self._blocks[lit.key] = lit
+            lit.prev = None
+        elif existing.tangle_root != lit.tangle_root:
             self._blocks[lit.key] = lit
             lit.prev = existing
         else:
@@ -258,10 +282,35 @@ class CodeBlockRegistry:
 
     def merge(self, other: CodeBlockRegistry) -> None:
         """
-        Merge antoher registry into this one.
+        Merge antoher registry into this one. This one comes from a document
+        defined before the other one (matters when resolving missing blocks).
+        The other registry must no longer be used after this.
+        """
+        print("== Merging ==")
+        print(f"self.missing = {self._missing}")
+        """
+        # Try and resolve missings in other
+        for missing in other._missing:
+            existing = self.get_rec_by_key(missing.key)
+            # Warning: Duplication with the end of _append_or_replace_codeblock
+            if existing is None:
+                self._missing.append(missing)
+                self._blocks[lit.key] = lit
+                lit.prev = None
+            else:
+                lit = other.get_by_key(missing.key)
+                assert(lit is not None) # block is always added when an entry is added to missings
+                if existing.tangle_root != lit.tangle_root:
+                    self._blocks[lit.key] = lit
+                    lit.prev = existing
+                else:
+                    existing.add_block(lit)
         """
         for lit in other.blocks():
-            self.add_codeblock(lit, refs)
+            if lit.relation_to_prev == 'NEW':
+                self.add_codeblock(lit)
+            else:
+                self._append_or_replace_codeblock(lit, lit.relation_to_prev)
         for key, refs in other._references.items():
             self._references[key].update(refs)
 
@@ -359,3 +408,21 @@ class CodeBlockRegistry:
     def _parent_tangle_root(self, tangle_root: str) -> str | None:
         h = self._hierarchy.get(tangle_root)
         return h.parent if h is not None else None
+
+    def check_integrity(self):
+        """
+        Thi is called when the whole doctree has been seen, it checks that
+        there is no more missing block otherwise throws an exception.
+        """
+        for missing in self._missing:
+            lit = self.get_by_key(missing.key)
+            assert(lit is not None)
+            action_str = {
+                'APPEND': "append to",
+                'REPLACE': "replace",
+            }[missing.relation_to_prev]
+            message = (
+                f"Trying to {action_str} a non existing literate code blocks {lit.format()}\n" +
+                f"  - In {lit.source_location.format()}.\n"
+            )
+            raise ExtensionError(message, modname="sphinx_literate")

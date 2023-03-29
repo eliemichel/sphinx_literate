@@ -28,6 +28,7 @@ def merge_registry(app, env, docnames, other):
 
 def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
     registry = CodeBlockRegistry.from_env(app.builder.env)
+    registry.check_integrity()
 
     has_literate_node = False
     for literate_node in doctree.findall(LiterateNode):
