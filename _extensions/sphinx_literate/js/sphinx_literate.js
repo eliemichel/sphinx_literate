@@ -154,7 +154,6 @@ function buildComment(content, lexer) {
 
 /**
  * Wrap the line that contains the element in a span with the given class name.
- * TODO: avoid wrapping extra new lines when lines are empty (split text nodes)
  */
 function createLineWrapper(element, className) {
 	const parentPre = element.closest("pre");
@@ -169,13 +168,25 @@ function createLineWrapper(element, className) {
 	const containerIndex = [].indexOf.call(parentPre.childNodes, container);
 
 	const elementsOnSameLine = [container];
+	// Find all next nodes on the same line
 	for (let i = containerIndex + 1 ; i < parentPre.childNodes.length ; ++i) {
 		const node = parentPre.childNodes[i];
-		elementsOnSameLine.push(node);
-		if (node.nodeType === Node.TEXT_NODE && node.nodeValue.indexOf("\n") != -1) {
+		const nlIdx = node.nodeValue.indexOf("\n");
+		if (node.nodeType === Node.TEXT_NODE && nlIdx != -1) {
+			if (nlIdx === node.nodeValue.length - 1) {
+				elementsOnSameLine.push(node);
+			} else {
+				// Split text node after the first new line
+				const nodeSecondHalf = document.createTextNode(node.nodeValue.substring(nlIdx + 1));
+				node.nodeValue = node.nodeValue.substring(0, nlIdx + 1);
+				elementsOnSameLine.push(node);
+				parentPre.insertBefore(nodeSecondHalf, node.nextSibling);
+			}
 			break;
 		}
+		elementsOnSameLine.push(node);
 	}
+	// Find all previous nodes on the same line
 	for (let i = containerIndex - 1 ; i >= 0 ; --i) {
 		const node = parentPre.childNodes[i];
 		if (node.nodeType === Node.TEXT_NODE && node.nodeValue.indexOf("\n") != -1) {
