@@ -54,7 +54,7 @@ def parse_option(raw_option: str) -> str|Tuple[str]:
         if raw_option[-1] != '"':
             raise ExtensionError(f"Unable to parse option '{raw_option}' (should end with '\"')")
         pattern = raw_option[j+1:-1]
-        return ('INSERT ' + placement, block_name, pattern)
+        return ('INSERT', block_name, placement, pattern)
         return ('INSERT BEFORE', block_name, pattern)
     else:
         return raw_option.upper()

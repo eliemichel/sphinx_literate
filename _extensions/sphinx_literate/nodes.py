@@ -149,8 +149,10 @@ class LiterateNode(nodes.General, nodes.Element):
                 'permalink': "#" + node.lit.target['refid'],
                 'replaced by': [],
                 'completed in': [],
-                'completing': [],
+                'patched by': [],
                 'replacing': [],
+                'completing': [],
+                'inserted in': [],
                 'referenced in': [],
             }
 
@@ -158,6 +160,7 @@ class LiterateNode(nodes.General, nodes.Element):
                 section = {
                     'REPLACE': 'replacing',
                     'APPEND': 'completing',
+                    'INSERT': 'inserted in',
                 }[node.lit.relation_to_prev]
                 metadata[section].append(
                     make_link_metadata(node.lit.prev)
@@ -167,6 +170,7 @@ class LiterateNode(nodes.General, nodes.Element):
                 section = {
                     'REPLACE': 'replaced by',
                     'APPEND': 'completed in',
+                    'INSERT': 'patched by',
                 }[node.lit.next.relation_to_prev]
                 metadata[section].append(
                     make_link_metadata(node.lit.next)

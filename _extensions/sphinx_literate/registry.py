@@ -9,6 +9,8 @@ from sphinx.errors import ExtensionError
 
 BlockOptions = Set[str|Tuple[str]]
 
+Key = str
+
 #############################################################
 
 @dataclass
@@ -27,15 +29,26 @@ class SourceLocation:
         return f"document '{self.docname}', line {self.lineno}"
 
 #############################################################
-# Codeblock
 
-Key = str
+@dataclass
+class InsertLocation:
+    # Either 'BEFORE' or 'AFTER'
+    placement: str
+
+    # Substring used to detect the line before/after which inserting
+    pattern: str
+
+#############################################################
+# Codeblock
 
 @dataclass
 class CodeBlock:
     """
     Data store about a code block parsed from a {lit} directive, to be
     assembled when tangling.
+    TODO This class should be split in 2 parts:
+     1. What directly comes from a given source block
+     2. What relates to CodeBlock being a nodes in the block graph
     """
 
     # Name of the code block (see title parsing)
@@ -69,7 +82,16 @@ class CodeBlock:
     # references in the parent tangle but NEW creates an independant chain of
     # blocks (which may or may not have the same name as one block from the
     # parent tangle root, but it does not matter).
+    # The special value 'INSERT' means that instead of considering the content
+    # of this block, we fetch from another one and insert before or after a
+    # given line.
     relation_to_prev: str = 'NEW'
+
+    # When relation_to_prev is 'INSERT', the content of this block is inserted
+    inserted_block: CodeBlock | None = None
+
+    # When relation_to_prev is 'INSERT', the inserted content is placed here
+    inserted_location: InsertLocation | None = None
 
     # The index of the block in the child list
     child_index: int = 0
@@ -115,18 +137,62 @@ class CodeBlock:
                 start = lit
             lit = lit.next
 
+        # Consolidate all INSERT nodes downstream of the last REPLACE
+        # Then create the maybeInsert function to handle them
+        insert_nodes = {
+            'BEFORE': defaultdict(list), # pattern: nodes
+            'AFTER': defaultdict(list), # pattern: nodes
+        }
+        lit = start
+        while lit is not None:
+            if lit.relation_to_prev == 'INSERT':
+                assert(not lit.content)
+                loc = lit.inserted_location
+                insert_nodes[loc.placement][loc.pattern].append(lit)
+            lit = lit.next
+
+        def _maybeInsertAux(l, placement):
+            matched = []
+            for pattern, nodes in insert_nodes[placement].items():
+                if pattern in l:
+                    for n in nodes:
+                        for ll in n.inserted_block.all_content():
+                            yield ll
+                    matched.append(pattern)
+            for pattern in matched:
+                del insert_nodes[placement][pattern]
+
+        def maybeInsert(l):
+            for ll in _maybeInsertAux(l, 'BEFORE'):
+                yield ll
+            yield l
+            for ll in _maybeInsertAux(l, 'AFTER'):
+                yield ll
+
         # If no replace, maybe add source from the parent tangle
         if start.prev is not None and start.relation_to_prev == 'APPEND':
             assert(start.prev.tangle_root != start.tangle_root)
             for l in start.prev.all_content():
-                yield l
+                for ll in maybeInsert(l):
+                    yield ll
 
         # Content of the start and next blocks
         lit = start
         while lit is not None:
             for l in lit.content:
-                yield l
+                for ll in maybeInsert(l):
+                    yield ll
             lit = lit.next
+
+        for placement, node_dict in insert_nodes.items():
+            for pattern, nodes in node_dict.items():
+                for n in nodes:
+                    message = (
+                        f"The block {n.inserted_block.format()} was supposed to be inserted {placement} "
+                        + f"\"{pattern}\" in block {self.format()}, " +
+                        + f"but no occurrence of this text was found."
+                    )
+                    raise ExtensionError(message, modname="sphinx_literate")
 
     def format(self):
         maybe_root = ''
@@ -158,7 +224,6 @@ class TangleHierarchyEntry:
     source_location: SourceLocation
 
 #############################################################
-# Codeblock registry
 
 @dataclass
 class MissingCodeBlock:
@@ -169,6 +234,9 @@ class MissingCodeBlock:
     """
     key: Key
     relation_to_prev: str
+
+#############################################################
+# Codeblock registry
 
 class CodeBlockRegistry:
     """
@@ -217,10 +285,30 @@ class CodeBlockRegistry:
         @param lit block to register
         @param options the options
         """
+        opt_dict = {
+            (x[0] if type(x) == tuple else x): x
+            for x in options
+        }
         if 'APPEND' in options:
             self._override_codeblock(lit, 'APPEND')
         elif 'REPLACE' in options:
             self._override_codeblock(lit, 'REPLACE')
+        elif 'INSERT' in opt_dict:
+            # In this case we add the block as new, and add a "modifier" block
+            # to the chain of the target of the insertion to notify it that it
+            # must fetch data from this new block chain.
+            self._add_codeblock(lit)
+
+            _, block_name, placement, pattern = opt_dict['INSERT']
+            modifier = CodeBlock(
+                name = block_name,
+                tangle_root = lit.tangle_root,
+                source_location = lit.source_location,
+                target = lit.target,
+            )
+            modifier.inserted_location = InsertLocation(placement, pattern)
+            modifier.inserted_block = lit
+            self._override_codeblock(modifier, 'INSERT')
         else:
             self._add_codeblock(lit)
 
@@ -254,6 +342,7 @@ class CodeBlockRegistry:
     def _override_codeblock(self, lit: CodeBlock, relation_to_prev: str):
         """
         Shared behavior between append_codeblock() and replace_codeblock()
+        @param args extra arguments precising the relation to previous block
         """
         lit.relation_to_prev = relation_to_prev
 
@@ -261,7 +350,7 @@ class CodeBlockRegistry:
 
         if existing is None:
             self._missing.append(
-                MissingCodeBlock(lit.key, relation_to_prev)
+                MissingCodeBlock(lit.key, lit.relation_to_prev)
             )
             # Add to the list of block with no parent, even though the
             # relation_to_prev is not NEW. This will be addressed when

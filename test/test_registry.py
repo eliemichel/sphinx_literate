@@ -224,5 +224,27 @@ class TestRegistryMerge(TestCase):
             reg_a.merge(reg_b)
         self.assertRaises(ExtensionError, dont)
 
+    def test_insert(self):
+        reg = CodeBlockRegistry()
+        reg.register_codeblock(CodeBlock(
+            name = "Block A1",
+            content = ["Hello, world", "Lorem ipsum"],
+        ))
+        reg.register_codeblock(CodeBlock(
+            name = "Block A2",
+            content = ["Inserted"],
+        ), [('INSERT', 'Block A1', 'AFTER', "Hello")])
+        reg.register_codeblock(CodeBlock(
+            name = "Block A2",
+            content = ["lines"],
+        ), ['APPEND'])
+
+        self.assertEqual(list(reg.get("Block A1").all_content()), [
+            "Hello, world",
+            "Inserted",
+            "lines",
+            "Lorem ipsum",
+        ])
+
 if __name__ == "__main__":
     main()
