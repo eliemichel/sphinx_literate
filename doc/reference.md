@@ -116,3 +116,5 @@ new foo
 bar
 foo
 ```
+
+See [Incremental demo](incremental-demo/index) for a live demo.
