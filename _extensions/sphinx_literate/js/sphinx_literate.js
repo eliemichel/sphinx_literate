@@ -290,12 +290,15 @@ class LitBlockInfo extends HTMLElement {
 		}
 
 		if (options.get('showReferenceDetails')) {
-			const details = ['replaced by', 'completed in', 'completing', 'replacing', 'referenced in'];
+			const details = ['replaced by', 'completed in', 'completing', 'patched by', 'replacing', 'referenced in', 'inserted in'];
 			details.map(section => {
 				if (data[section].length > 0) {
 					wrapper.append(document.createTextNode(" " + section + " "));
 					data[section].map(lit => {
 						wrapper.append(...this.createLitLink(lit.name, lit.url));
+						if (lit.details) {
+							wrapper.append(document.createTextNode(" " + lit.details));
+						}
 					});
 				}
 			});

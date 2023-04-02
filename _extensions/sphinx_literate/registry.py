@@ -75,7 +75,7 @@ class CodeBlock:
     next: CodeBlock | None = None
     prev: CodeBlock | None = None
 
-    # This is either 'NEW, 'APPEND' or 'REPLACE', telling whether this block's
+    # This is either 'NEW*'', 'APPEND' or 'REPLACE', telling whether this block's
     # content must be added to the result of evaluating the previous ones or
     # whether it replaces the previous content.
     # The difference between NEW and REPLACE is that REPLACE affects lit
@@ -85,6 +85,9 @@ class CodeBlock:
     # The special value 'INSERT' means that instead of considering the content
     # of this block, we fetch from another one and insert before or after a
     # given line.
+    # The value 'INSERTED' means a new block that is inserted somewhere, whereas
+    # INSERT is the value used for the modifier node in the chain of the target
+    # of the insertion.
     relation_to_prev: str = 'NEW'
 
     # When relation_to_prev is 'INSERT', the content of this block is inserted
@@ -309,6 +312,9 @@ class CodeBlockRegistry:
             modifier.inserted_location = InsertLocation(placement, pattern)
             modifier.inserted_block = lit
             self._override_codeblock(modifier, 'INSERT')
+
+            lit.relation_to_prev = 'INSERTED'
+            lit.prev = modifier
         else:
             self._add_codeblock(lit)
 

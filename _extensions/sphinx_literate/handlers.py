@@ -9,23 +9,27 @@ from sphinx.environment.adapters.toctree import TocTree
 from .registry import CodeBlock, CodeBlockRegistry
 from .nodes import LiterateNode, TangleNode, RegistryNode
 from .tangle import tangle
+from .utils import print_traceback
 
 from docutils import nodes
 
 ####################################################
 
+@print_traceback
 def purge_registry(app: Sphinx, env, docname: str):
     registry = CodeBlockRegistry.from_env(env)
     registry.remove_codeblocks_by_docname(docname)
 
 ####################################################
 
+@print_traceback
 def merge_registry(app, env, docnames, other):
     registry = CodeBlockRegistry.from_env(env)
     registry.merge(CodeBlockRegistry.from_env(other))
 
 ####################################################
 
+@print_traceback
 def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
     registry = CodeBlockRegistry.from_env(app.builder.env)
     registry.check_integrity()
@@ -93,6 +97,7 @@ def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
 
 ####################################################
 
+@print_traceback
 def copy_custom_files(app: Sphinx, exc):
     if app.config.lit_use_default_style:
         asset_files = [
@@ -108,6 +113,7 @@ def copy_custom_files(app: Sphinx, exc):
 
 #############################################################
 
+@print_traceback
 def html_page_context(
     app: Sphinx,
     docname: str,

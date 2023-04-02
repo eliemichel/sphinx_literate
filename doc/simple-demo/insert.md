@@ -31,6 +31,10 @@ add_executable(App main.cpp)
 add_subdirectory(glfw)
 ```
 
+```{lit} CMake, Add deps (append)
+add_subdirectory(webgpu)
+```
+
 Tangled result
 --------------
 

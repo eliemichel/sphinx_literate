@@ -138,10 +138,11 @@ class LiterateNode(nodes.General, nodes.Element):
 
             docname = node.lit.source_location.docname
 
-            def make_link_metadata(lit):
+            def make_link_metadata(lit, details = None):
                 return {
                     'name': lit.name,
                     'url': lit.link_url(docname, self.builder),
+                    'details': details,
                 }
 
             metadata = {
@@ -160,10 +161,20 @@ class LiterateNode(nodes.General, nodes.Element):
                 section = {
                     'REPLACE': 'replacing',
                     'APPEND': 'completing',
-                    'INSERT': 'inserted in',
+                    'INSERT': None, # not happening
+                    'INSERTED': 'inserted in',
                 }[node.lit.relation_to_prev]
+
+                prev = node.lit.prev
+                details = None
+                if node.lit.relation_to_prev == 'INSERTED':
+                    # prev is the modifier, we need the prev of the modifier
+                    modifier = prev
+                    prev = modifier.prev
+                    loc = modifier.inserted_location
+                    details = f'{loc.placement.lower()} "{loc.pattern}"'
                 metadata[section].append(
-                    make_link_metadata(node.lit.prev)
+                    make_link_metadata(prev, details)
                 )
 
             if node.lit.next is not None:
@@ -171,6 +182,7 @@ class LiterateNode(nodes.General, nodes.Element):
                     'REPLACE': 'replaced by',
                     'APPEND': 'completed in',
                     'INSERT': 'patched by',
+                    'INSERTED': None, # not happening
                 }[node.lit.next.relation_to_prev]
                 metadata[section].append(
                     make_link_metadata(node.lit.next)
