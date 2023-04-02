@@ -286,31 +286,18 @@ class CodeBlockRegistry:
         defined before the other one (matters when resolving missing blocks).
         The other registry must no longer be used after this.
         """
-        print("== Merging ==")
-        print(f"self.missing = {self._missing}")
-        """
-        # Try and resolve missings in other
-        for missing in other._missing:
-            existing = self.get_rec_by_key(missing.key)
-            # Warning: Duplication with the end of _append_or_replace_codeblock
-            if existing is None:
-                self._missing.append(missing)
-                self._blocks[lit.key] = lit
-                lit.prev = None
-            else:
-                lit = other.get_by_key(missing.key)
-                assert(lit is not None) # block is always added when an entry is added to missings
-                if existing.tangle_root != lit.tangle_root:
-                    self._blocks[lit.key] = lit
-                    lit.prev = existing
-                else:
-                    existing.add_block(lit)
-        """
+        # Merge tangle hierarchies
+        for h in other._hierarchy.values():
+            self.set_tangle_parent(h.root, h.parent, h.source_location)
+
+        # Merge blocks
         for lit in other.blocks():
             if lit.relation_to_prev == 'NEW':
                 self.add_codeblock(lit)
             else:
                 self._append_or_replace_codeblock(lit, lit.relation_to_prev)
+
+        # Merge cross-references
         for key, refs in other._references.items():
             self._references[key].update(refs)
 
@@ -322,7 +309,7 @@ class CodeBlockRegistry:
             if lit.source_location.docname != docname
         }
 
-    def set_tangle_parent(self, tangle_root: str, parent: str, source_location: SourceLocation) -> None:
+    def set_tangle_parent(self, tangle_root: str, parent: str, source_location: SourceLocation = SourceLocation()) -> None:
         """
         Set the parent for a given tangle root. Fail if a different root has
         already been defined.
@@ -346,6 +333,16 @@ class CodeBlockRegistry:
                 parent = parent,
                 source_location = source_location,
             )
+
+            # Now that 'tangle_root' has a parent, blocks that were missing for
+            # this tangle may be resolved
+            def isStillUnresolved(missing):
+                missing_tangle_root, missing_name = missing.key.split("##")
+                if missing_tangle_root == tangle_root:
+                    if self.get_rec_by_key(missing.key) is not None:
+                        return False
+                return True
+            self._missing = list(filter(isStillUnresolved, self._missing))
 
     def blocks(self) -> CodeBlock:
         return self._blocks.values()
