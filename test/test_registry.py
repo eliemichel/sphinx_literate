@@ -22,24 +22,24 @@ class TestRegistryBasics(TestCase):
 class TestRegistryMerge(TestCase):
     def test_merge_simple(self):
         reg_a = CodeBlockRegistry()
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A1",
             content = ["A1"],
         ))
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A2",
             content = ["A2"],
         ))
 
         reg_b = CodeBlockRegistry()
-        reg_b.add_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block B1",
             content = ["B1"],
         ))
-        reg_b.replace_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block A1",
             content = ["B2"],
-        ))
+        ), ['REPLACE'])
 
         self.assertEqual(reg_a._missing, [])
         self.assertEqual(len(reg_b._missing), 1)
@@ -54,24 +54,24 @@ class TestRegistryMerge(TestCase):
 
     def test_merge_missing(self):
         reg_a = CodeBlockRegistry()
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A1",
             content = ["A1"],
         ))
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A2",
             content = ["A2"],
         ))
 
         reg_b = CodeBlockRegistry()
-        reg_b.add_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block B1",
             content = ["B1"],
         ))
-        reg_b.replace_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block C1",
             content = ["B2"],
-        ))
+        ), ['REPLACE'])
 
         self.assertEqual(reg_a._missing, [])
         self.assertEqual(len(reg_b._missing), 1)
@@ -86,28 +86,28 @@ class TestRegistryMerge(TestCase):
 
     def test_merge_multi_root(self):
         reg_a = CodeBlockRegistry()
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A1",
             tangle_root = "A",
             content = ["A1"],
         ))
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A2",
             tangle_root = "A",
             content = ["A2"],
         ))
 
         reg_b = CodeBlockRegistry()
-        reg_b.add_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block B1",
             tangle_root = "B",
             content = ["B1"],
         ))
-        reg_b.replace_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block A1",
             tangle_root = "B",
             content = ["B2"],
-        ))
+        ), ['REPLACE'])
 
         self.assertEqual(reg_a._missing, [])
         self.assertEqual(len(reg_b._missing), 1)
@@ -123,12 +123,12 @@ class TestRegistryMerge(TestCase):
 
     def test_merge_parented_root(self):
         reg_a = CodeBlockRegistry()
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A1",
             tangle_root = "A",
             content = ["A1"],
         ))
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A2",
             tangle_root = "A",
             content = ["A2"],
@@ -136,16 +136,16 @@ class TestRegistryMerge(TestCase):
 
         reg_b = CodeBlockRegistry()
         reg_b.set_tangle_parent("B", "A")
-        reg_b.add_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block B1",
             tangle_root = "B",
             content = ["B1"],
         ))
-        reg_b.replace_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block A1",
             tangle_root = "B",
             content = ["B2"],
-        ))
+        ), ['REPLACE'])
 
         self.assertEqual(reg_a._missing, [])
         self.assertEqual(len(reg_b._missing), 1)
@@ -162,28 +162,28 @@ class TestRegistryMerge(TestCase):
 
     def test_merge_late_parented_root(self):
         reg_a = CodeBlockRegistry()
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A1",
             tangle_root = "A",
             content = ["A1"],
         ))
-        reg_a.add_codeblock(CodeBlock(
+        reg_a.register_codeblock(CodeBlock(
             name = "Block A2",
             tangle_root = "A",
             content = ["A2"],
         ))
 
         reg_b = CodeBlockRegistry()
-        reg_b.add_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block B1",
             tangle_root = "B",
             content = ["B1"],
         ))
-        reg_b.replace_codeblock(CodeBlock(
+        reg_b.register_codeblock(CodeBlock(
             name = "Block A1",
             tangle_root = "B",
             content = ["B2"],
-        ))
+        ), ['REPLACE'])
 
         self.assertEqual(reg_a._missing, [])
         self.assertEqual(len(reg_b._missing), 1)

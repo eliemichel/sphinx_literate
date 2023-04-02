@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import random
 import re
 
-from .registry import CodeBlock, Key
+from .registry import CodeBlock, Key, BlockOptions
 
 from sphinx.errors import ExtensionError
 
@@ -31,7 +31,7 @@ class ParsedBlockTitle:
     lexer: str | None = None
 
     # Possible options are 'APPEND', 'REPLACE', ('INSERT AFTER', "foo", "bar"), ...
-    options: Set[str|Tuple[str]] = field(default_factory=set)
+    options: BlockOptions = field(default_factory=set)
 
 #############################################################
 

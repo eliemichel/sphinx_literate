@@ -119,3 +119,13 @@ foo
 ```
 
 See [Incremental demo](incremental-demo/index) for a live demo.
+
+Debugging
+---------
+
+In order to help you debug the graph of `lit` block references, you can use the following directive:
+
+````
+```{lit-registry}
+```
+````

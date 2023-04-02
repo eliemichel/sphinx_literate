@@ -7,7 +7,7 @@ from sphinx.util.fileutil import copy_asset_file
 from sphinx.environment.adapters.toctree import TocTree
 
 from .registry import CodeBlock, CodeBlockRegistry
-from .nodes import LiterateNode, TangleNode
+from .nodes import LiterateNode, TangleNode, RegistryNode
 from .tangle import tangle
 
 from docutils import nodes
@@ -82,6 +82,14 @@ def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
     if not hasattr(app.builder.env, 'lit_doc_contains_block'):
         app.builder.env.lit_doc_contains_block = {}
     app.builder.env.lit_doc_contains_block[fromdocname] = has_literate_node
+
+    registry_dump = registry.pretty_dump()
+    for registry_node in doctree.findall(RegistryNode):
+        block_node = registry_node.raw_block_node
+        block_node.rawsource = '\n'.join(registry_dump)
+        block_node.children.clear()
+        block_node.children.append(nodes.Text(block_node.rawsource))
+        registry_node.replace_self([block_node])
 
 ####################################################
 

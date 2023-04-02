@@ -1,9 +1,13 @@
 from __future__ import annotations
-from typing import Any, Dict, Set
+from typing import Any, Dict, Set, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
 
 from sphinx.errors import ExtensionError
+
+#############################################################
+
+BlockOptions = Set[str|Tuple[str]]
 
 #############################################################
 
@@ -197,7 +201,30 @@ class CodeBlockRegistry:
         # parallel units.
         self._missing: List[MissingCodeBlock] = []
 
-    def add_codeblock(self, lit: CodeBlock) -> None:
+    def register_codeblock(self, lit: CodeBlock, options: BlockOptions = set()) -> None:
+        """
+        Add a new code block to the repository. The behavior depends on the
+        options:
+         - If 'APPEND' is present in the options, append the content of the
+           code block to the code block that already has the same name.
+           If such a block does not exist, it is added to the list of missing
+           blocks (so check_integrity() will raise an exception).
+         - If 'REPLACE' is in the options, replace a block and all its children
+           with a new one. If such a block does not exist, it is added to the
+           list of missing blocks.
+         - Otherwise, the block is added as NEW and if a block already exists
+           with the same key, an error is raised.
+        @param lit block to register
+        @param options the options
+        """
+        if 'APPEND' in options:
+            self._override_codeblock(lit, 'APPEND')
+        elif 'REPLACE' in options:
+            self._override_codeblock(lit, 'REPLACE')
+        else:
+            self._add_codeblock(lit)
+
+    def _add_codeblock(self, lit: CodeBlock) -> None:
         """
         Add a new code block to the repository. If a block already exists with
         the same key, an error is raised.
@@ -224,23 +251,7 @@ class CodeBlockRegistry:
         lit.relation_to_prev = 'NEW'
         self._blocks[key] = lit
 
-    def append_codeblock(self, lit: CodeBlock) -> None:
-        """
-        Append the content of the code block to the code block that already has
-        the same name. Raises an exception if such a block does not exist.
-        @param lit block to append
-        """
-        self._append_or_replace_codeblock(lit, 'APPEND')
-
-    def replace_codeblock(self, lit: CodeBlock) -> None:
-        """
-        Replace a block and all this children with a new one. Raises an
-        exception if such a block does not exist.
-        @param lit block to append
-        """
-        self._append_or_replace_codeblock(lit, 'REPLACE')
-
-    def _append_or_replace_codeblock(self, lit: CodeBlock, relation_to_prev: str):
+    def _override_codeblock(self, lit: CodeBlock, relation_to_prev: str):
         """
         Shared behavior between append_codeblock() and replace_codeblock()
         """
@@ -249,17 +260,6 @@ class CodeBlockRegistry:
         existing = self.get_rec(lit.name, lit.tangle_root)
 
         if existing is None:
-            """
-            action_str = {
-                'APPEND': "append to",
-                'REPLACE': "replace",
-            }[relation_to_prev]
-            message = (
-                f"Trying to {action_str} a non existing literate code blocks {lit.format()}\n" +
-                f"  - In {lit.source_location.format()}.\n"
-            )
-            raise ExtensionError(message, modname="sphinx_literate")
-            """
             self._missing.append(
                 MissingCodeBlock(lit.key, relation_to_prev)
             )
@@ -293,9 +293,9 @@ class CodeBlockRegistry:
         # Merge blocks
         for lit in other.blocks():
             if lit.relation_to_prev == 'NEW':
-                self.add_codeblock(lit)
+                self._add_codeblock(lit)
             else:
-                self._append_or_replace_codeblock(lit, lit.relation_to_prev)
+                self._override_codeblock(lit, lit.relation_to_prev)
 
         # Merge cross-references
         for key, refs in other._references.items():
@@ -423,3 +423,38 @@ class CodeBlockRegistry:
                 f"  - In {lit.source_location.format()}.\n"
             )
             raise ExtensionError(message, modname="sphinx_literate")
+
+    def pretty_dump(self, options: List[str] = set()):
+        """
+        Display debug information about the registry.
+        Used by {lit-registry} directive.
+        """
+        options = set()
+        ret = []
+        ret += ["== Registry dump =="]
+        ret += ["Blocks:"]
+        for lit in self._blocks.values():
+            ret += [
+                f" - {lit.name}"
+                + (f" ({lit.tangle_root})" if lit.tangle_root is not None else "")
+                + f" [{lit.relation_to_prev}]"
+            ]
+            if 'SHOW LOCATION' in options:
+                ret += [f"   | From: " + lit.source_location.format()]
+
+            if lit.prev is not None:
+                ret += ["   | Prev: " + lit.prev.name + (f" ({lit.prev.tangle_root})" if lit.prev.tangle_root is not None else "")]
+
+            next_lit = lit.next
+            while next_lit is not None:
+                ret += [
+                    "   | Next: " + next_lit.name
+                    + (f" ({next_lit.tangle_root})" if next_lit.tangle_root is not None else "")
+                    + f" [{next_lit.relation_to_prev}]"
+                ]
+                next_lit = next_lit.next
+        ret += [""]
+        ret += ["Missing:"]
+        for missing in self._missing:
+            ret += [f" - {missing.key} [{missing.relation_to_prev}]"]
+        return ret

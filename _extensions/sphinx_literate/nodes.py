@@ -19,6 +19,15 @@ class TangleNode(nodes.General, nodes.Element):
 
 #############################################################
 
+class RegistryNode(nodes.General, nodes.Element):
+    def __init__(self, source_location, raw_block_node, *args):
+        self.source_location = source_location
+        self.raw_block_node = raw_block_node
+
+        super().__init__(*args)
+
+#############################################################
+
 class LiterateHighlighter:
     """
     A custom code block highlighter that uses an existing highlighter and

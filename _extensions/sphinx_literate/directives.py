@@ -12,7 +12,7 @@ from sphinx.application import Sphinx
 
 from .parse import parse_block_content, parse_block_title
 from .registry import CodeBlock, CodeBlockRegistry, SourceLocation
-from .nodes import LiterateNode, TangleNode
+from .nodes import LiterateNode, TangleNode, RegistryNode
 
 #############################################################
 
@@ -87,6 +87,30 @@ class TangleDirective(SphinxCodeBlock):
 
 #############################################################
 
+class RegistryDirective(SphinxCodeBlock):
+    """
+    This is close to the tangle directive, in the fact that it creates a code
+    block that will be populated only.
+    """
+
+    required_arguments = 0
+    optional_arguments = 0
+
+    def run(self):
+        raw_block_node = super().run()[0]
+
+        return [
+            RegistryNode(
+                SourceLocation(
+                    docname = self.env.docname,
+                    lineno = self.lineno,
+                ),
+                raw_block_node,
+            )
+        ]
+
+#############################################################
+
 class LiterateDirective(SphinxCodeBlock):
 
     has_content = True
@@ -115,13 +139,8 @@ class LiterateDirective(SphinxCodeBlock):
         )
 
         lit_codeblocks = CodeBlockRegistry.from_env(self.env)
-        if 'APPEND' in parsed_title.options:
-            lit_codeblocks.append_codeblock(self.lit)
-        elif 'REPLACE' in parsed_title.options:
-            lit_codeblocks.replace_codeblock(self.lit)
-        else:
-            lit_codeblocks.add_codeblock(self.lit)
-
+        lit_codeblocks.register_codeblock(self.lit, parsed_title.options)
+        
         for ref in self.parsed_content.uid_to_block_link.values():
             lit_codeblocks.add_reference(self.lit.key, ref.key)
 
@@ -169,4 +188,5 @@ class LiterateDirective(SphinxCodeBlock):
 def setup(app: Sphinx) -> None:
     app.add_directive("lit-setup", LiterateSetupDirective)
     app.add_directive("lit", LiterateDirective)
+    app.add_directive("lit-registry", RegistryDirective)
     app.add_directive("tangle", TangleDirective)
