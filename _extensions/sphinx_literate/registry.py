@@ -176,7 +176,7 @@ class CodeBlock:
                 yield ll
 
         # If no replace, maybe add source from the parent tangle
-        if start.prev is not None and start.relation_to_prev == 'APPEND':
+        if start.prev is not None and start.relation_to_prev in {'APPEND', 'INSERT'}:
             assert(start.prev.tangle_root != start.tangle_root)
             for l in start.prev.all_content():
                 for ll in maybeInsert(l):
@@ -194,8 +194,8 @@ class CodeBlock:
             for pattern, nodes in node_dict.items():
                 for n in nodes:
                     message = (
-                        f"The block {n.inserted_block.format()} was supposed to be inserted {placement} "
-                        + f"\"{pattern}\" in block {self.format()}, " +
+                        f"The block {n.inserted_block.format()} was supposed to be inserted {placement.lower()} "
+                        + f"\"{pattern}\" in block {self.format()}, "
                         + f"but no occurrence of this text was found."
                     )
                     raise ExtensionError(message, modname="sphinx_literate")
@@ -516,6 +516,7 @@ class CodeBlockRegistry:
             action_str = {
                 'APPEND': "append to",
                 'REPLACE': "replace",
+                'INSERT': "insert to",
             }[missing.relation_to_prev]
             message = (
                 f"Trying to {action_str} a non existing literate code blocks {lit.format()}\n" +

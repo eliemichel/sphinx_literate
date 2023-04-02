@@ -246,5 +246,44 @@ class TestRegistryMerge(TestCase):
             "Lorem ipsum",
         ])
 
+    def test_insert_with_parent(self):
+        reg = CodeBlockRegistry()
+        reg.set_tangle_parent("B", "A")
+        reg.register_codeblock(CodeBlock(
+            name = "Block A1",
+            tangle_root = "A",
+            content = ["Hello, world", "Lorem ipsum"],
+        ))
+        reg.register_codeblock(CodeBlock(
+            name = "Block A2",
+            tangle_root = "B",
+            content = ["Inserted"],
+        ), [('INSERT', 'Block A1', 'AFTER', "Hello")])
+        reg.register_codeblock(CodeBlock(
+            name = "Block A2",
+            tangle_root = "B",
+            content = ["lines"],
+        ), ['APPEND'])
+
+        block_A1_A = reg.get("Block A1", "A")
+        block_A1_B = reg.get("Block A1", "B")
+        block_A2_B = reg.get("Block A2", "B")
+        self.assertNotEqual(block_A1_B, None)
+        self.assertEqual(block_A1_B.relation_to_prev, 'INSERT')
+        self.assertEqual(block_A2_B.relation_to_prev, 'INSERTED')
+        self.assertEqual(block_A1_B.prev, block_A1_A)
+
+        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+            "Hello, world",
+            "Lorem ipsum",
+        ])
+
+        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+            "Hello, world",
+            "Inserted",
+            "lines",
+            "Lorem ipsum",
+        ])
+
 if __name__ == "__main__":
     main()
