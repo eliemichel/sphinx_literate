@@ -320,6 +320,7 @@ class CodeBlockRegistry:
             lit.relation_to_prev = 'INSERTED'
             lit.prev = modifier
         else:
+            lit.relation_to_prev = 'NEW'
             self._add_codeblock(lit)
 
     def _add_codeblock(self, lit: CodeBlock) -> None:
@@ -346,7 +347,6 @@ class CodeBlockRegistry:
             )
             raise ExtensionError(message, modname="sphinx_literate")
 
-        lit.relation_to_prev = 'NEW'
         self._blocks[key] = lit
 
     def _override_codeblock(self, lit: CodeBlock, relation_to_prev: str):
@@ -391,7 +391,7 @@ class CodeBlockRegistry:
 
         # Merge blocks
         for lit in other.blocks():
-            if lit.relation_to_prev == 'NEW':
+            if lit.relation_to_prev in {'NEW', 'INSERTED'}:
                 self._add_codeblock(lit)
             else:
                 self._override_codeblock(lit, lit.relation_to_prev)
@@ -517,6 +517,7 @@ class CodeBlockRegistry:
                 'APPEND': "append to",
                 'REPLACE': "replace",
                 'INSERT': "insert to",
+                'INSERTED': "???",
             }[missing.relation_to_prev]
             message = (
                 f"Trying to {action_str} a non existing literate code blocks {lit.format()}\n" +

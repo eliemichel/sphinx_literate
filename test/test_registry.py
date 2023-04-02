@@ -285,5 +285,78 @@ class TestRegistryMerge(TestCase):
             "Lorem ipsum",
         ])
 
+    def test_insert_with_merged_parent(self):
+        reg_a = CodeBlockRegistry()
+        reg_a.register_codeblock(CodeBlock(
+            name = "Block A1",
+            tangle_root = "A",
+            content = ["Hello, world", "Lorem ipsum"],
+        ))
+        reg_b = CodeBlockRegistry()
+        reg_b.set_tangle_parent("B", "A")
+        reg_b.register_codeblock(CodeBlock(
+            name = "Block A2",
+            tangle_root = "B",
+            content = ["Inserted"],
+        ), [('INSERT', 'Block A1', 'AFTER', "Hello")])
+        reg_b.register_codeblock(CodeBlock(
+            name = "Block A2",
+            tangle_root = "B",
+            content = ["lines"],
+        ), ['APPEND'])
+
+        reg = reg_a
+        reg.merge(reg_b)
+
+        reg.check_integrity()
+
+        block_A1_A = reg.get("Block A1", "A")
+        block_A1_B = reg.get("Block A1", "B")
+        block_A2_B = reg.get("Block A2", "B")
+        self.assertNotEqual(block_A1_B, None)
+        self.assertEqual(block_A1_B.relation_to_prev, 'INSERT')
+        self.assertEqual(block_A2_B.relation_to_prev, 'INSERTED')
+        self.assertEqual(block_A1_B.prev, block_A1_A)
+
+        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+            "Hello, world",
+            "Lorem ipsum",
+        ])
+
+        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+            "Hello, world",
+            "Inserted",
+            "lines",
+            "Lorem ipsum",
+        ])
+
+    def test_non_linear_parenting(self):
+        reg = CodeBlockRegistry()
+        reg.set_tangle_parent("B", "A")
+
+        # First append in child
+        reg.register_codeblock(CodeBlock(
+            name = "Block A1",
+            tangle_root = "B",
+            content = ["Line 2"],
+        ), ['APPEND'])
+
+        # Then define in parent
+        reg.register_codeblock(CodeBlock(
+            name = "Block A1",
+            tangle_root = "A",
+            content = ["Line 1"],
+        ))
+
+        reg.check_integrity()
+
+        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+            "Line 1",
+        ])
+        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+            "Line 1",
+            "Line 2",
+        ])
+
 if __name__ == "__main__":
     main()
