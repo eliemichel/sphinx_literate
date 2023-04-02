@@ -1,13 +1,28 @@
 Introduction
 ============
 
-*sphinx_literate* is an extension inspired by the concept of Literate Programming
+```{lit-setup}
+:tangle-root: Introduction
+```
 
-It provides a directive close to code blocks, called `lit`. The author can
-specify how these literate code blocks should be assembled together in order to
-produce the full code that is presented in the documentation.
+*sphinx_literate* is an extension inspired by the concept of **Literate Programming**.
 
-Let's take a very simple example:
+It provides a *directive* called `lit`, which is close to Sphinx' native code block directive, except that the author can **specify how these literate code blocks should be assembled together** in order to produce the full code that is presented in the documentation.
+
+This literate code block provides 2 complementary features:
+
+ 1. The documentation's source code can be transformed into a **fully working
+    code**. This is traditionally called the **tangled** code.
+
+ 2. The documentation can display links that **help navigating** through the code
+    even though the documentation presents it non-linearly.
+
+Simple example
+--------------
+
+### Source
+
+Let's take a very simple example. The following snippet in the documentation's source defines a first `lit` block:
 
 ````
 ```{lit} Base skeleton
@@ -18,7 +33,24 @@ int main(int, char**) {
 ```
 ````
 
-And we can later define the main content:
+```{note}
+I am using [MyST](https://myst-parser.readthedocs.io/en/latest/) syntax instead of Sphinx' default ReST.
+```
+
+There are **two key differences** with a usual code block:
+
+ 1. A `lit` block always has a **name**, e.g., *"Base skeleton"*.
+ 2. The content of a `lit` block can contain **references** like in this case `{{Main content}}`, which points to the block whose name is *"Main content"*, whenever this will be defined.
+
+```{important}
+There is **no need** for the referenced block *"Main content"* **to be already defined**. The natural order in which things are introduced in a literate program is often not the same as the order in which a program is written.
+```
+
+```{note}
+A block name can include spaces, but it must not include comma `,` nor parentheses `(`.
+```
+
+And we can later define the main content, in another `lit` block.
 
 ````
 ```{lit} C++, Main content
@@ -26,121 +58,63 @@ std::cout << "Hello world" << std::endl;
 ```
 ````
 
-This naming provides 2 complementzary features:
+One addition here is the **language for syntax highlight**: `C++` is specified before the name, separated from the block name by a comma. This is optional.
 
- 1. The documentation's source code can be transformed into a fully working
-    code. This is traditionnaly called the **tangled** code.
+### HTML Result
 
- 2. The documentation can display links that help navigating through the code
-    even though the documentation presents it non-linearily.
+When building the HTML documentation as usual with `make html`, this block is compiled into the following:
 
-**NB** The syntax for referencing other code blocks is `<<Some block name>>`
-by default, but as this may conflict with the syntax of your programming
-language, you can customize it with the options `lit_begin_ref` and
-`lit_end_ref`.
-
-**NB** The language lexer name (C++ in the example above) is optional, and
-provided as a first token separated from the block name by a comma (,).
-
-When the block name starts with "file:", the block is considered as the root
-and the remaining of the name is the path of the file into which the tangled
-content must be saved, relative to the root tangle directory.
-
-Block title
------------
-
-The title of a literate block is structured as follows:
-
-```
-Language, The full title (some, option)
+```{lit} C++, Base skeleton
+#include <iostream>
+int main(int, char**) {
+    {{Main content}}
+}
 ```
 
-This means that the language parser is "Language", the reference name of the block is "The full title" and it has options 'SOME' and 'OPTION'. Valid options are:
+```{lit} C++, Main content
+std::cout << "Hello world" << std::endl;
+```
 
- - **APPEND** Add the content of this block to the previous blocks with the same name
- - **REPLACE** Replace the content of this block
+You can see that the reference to *Main content* in the first block is replaced by a navigation link that references the second block.
 
-Append and replace require that the block has already been defined, and only work within the same document for now.
+Depending on the "literate options" that you set, you may see each block's name in its lower-right corner, as well as links to where it is referenced and modified.
 
-Local setup
------------
+```{figure} /doc/images/literate-options-dark.png
+:align: center
+:class: with-shadow
+The literate options, located in the right-hand panel.
+```
 
-The `lit-setup` directive can be used to setup local options.
+```{note}
+The literate options buttons have only been tested with the [Furo](https://github.com/pradyunsg/furo) Sphinx theme, this may require some adaptation for other themes.
+```
 
- - **tangle-root** The same sphinx documentation can tangle multiple source trees. This sets the root of all files defined later in the file. Two literate blocks defined in different roots can have the same name.
+### Tangled Result
 
- - **parent** The tangle root from which this one inherits.
+This extension adds a new builder, called **tangling**. You can call it with:
 
-For instance:
+```
+make tangle
+```
+
+This will create in `_build/tangle` a hierarchy of files from the content of the documentation. This only looks at blocks whose name starts with "file:" to create files. Let us then add an extra `lit` block:
 
 ````
-```{lit-setup}
-:tangle-root: incremental-demo
+```{lit} C++, file:main.cpp
+{{Base skeleton}}
 ```
 ````
 
-Inheritance
------------
+```{lit} C++, file:main.cpp
+{{Base skeleton}}
+```
 
-When a tangle root inherit from another one (i.e., this other one is set as its parent), it can reference previously defined blocks:
+When tangling, you can see a file `main.cpp` in the tangle directory. It is also possible to display the tangled result directly in the documentation using the `tangle` directive:
 
 ````
-```{lit-setup}
-:tangle-root: versionA
-```
-
-```{lit} A block
-foo
-```
-
-```{lit} Another block
-bar
-{{A block}}
+```{tangle} Base skeleton
 ```
 ````
 
-````
-```{lit-setup}
-:tangle-root: versionB
-:parent: versionA
-```
-
-```{lit} Result block
-{{A block}}
-{{Another block}}
-```
-````
-
-Tangling `Result block` gives:
-
-```
-foo
-bar
-foo
-```
-
-When defining a block in a child tangle root with the same name as a block previously defined in the parent, it does not change the content of parent tangling, unless they use modifier options like 'replace' and 'append':
-
-````
-```{lit-setup}
-:tangle-root: versionC
-:parent: versionA
-```
-
-```{lit} A block (replace)
-new foo
-```
-
-```{lit} Result block
-{{A block}}
-{{Another block}}
-```
-````
-
-Tangling `Result block` gives:
-
-```
-new foo
-bar
-foo
+```{tangle} Base skeleton
 ```
