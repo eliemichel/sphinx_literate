@@ -1,4 +1,4 @@
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Tuple
 from dataclasses import dataclass, field
 import random
 import re
@@ -30,10 +30,89 @@ class ParsedBlockTitle:
     # Name of the language lexer
     lexer: str | None = None
 
-    # Possible options are 'APPEND' and 'REPLACE'
-    options: Set[str] = field(default_factory=list)
+    # Possible options are 'APPEND', 'REPLACE', ('INSERT AFTER', "foo", "bar"), ...
+    options: Set[str|Tuple[str]] = field(default_factory=set)
 
 #############################################################
+
+def parse_option(raw_option: str) -> str|Tuple[str]:
+    # TODO: route config up to here
+    begin_ref = '{{' # config.lit_begin_ref
+    end_ref = '}}' # config.lit_end_ref
+
+    raw_option = raw_option.strip()
+    if raw_option.lower().startswith("insert in " + begin_ref.lower()):
+        offset = len("insert in " + begin_ref)
+        i = raw_option.find(end_ref, offset)
+        if i == -1:
+            raise ExtensionError(f"Unable to parse option '{raw_option}' (could not find end of block name)")
+        block_name = raw_option[offset:i]
+        j = raw_option.find('"', i)
+        placement = raw_option[i+len(end_ref):j].strip().upper()
+        if j == -1:
+            raise ExtensionError(f"Unable to parse option '{raw_option}' (could not find beginning of line pattern)")
+        if raw_option[-1] != '"':
+            raise ExtensionError(f"Unable to parse option '{raw_option}' (should end with '\"')")
+        pattern = raw_option[j+1:-1]
+        return ('INSERT ' + placement, block_name, pattern)
+        return ('INSERT BEFORE', block_name, pattern)
+    else:
+        return raw_option.upper()
+
+def parse_block_title_options(raw_options: str) -> Set[str|Tuple[str]]:
+    if raw_options is None:
+        return set()
+    raw_options = raw_options[1:-1]
+
+    # Parsing automata, possible states:
+    (
+        DEFAULT,
+        IN_STRING,
+        IN_STRING_ESCAPE,
+    ) = range(3)
+    # Possible actions:
+    (
+        ACCUMULATE,
+        NEW_TOKEN,
+        IGNORE,
+    ) = range(3)
+    transitions = {
+        DEFAULT: {
+            '"': (IN_STRING, ACCUMULATE),
+            ',': (DEFAULT, NEW_TOKEN),
+            ...: (DEFAULT, ACCUMULATE),
+        },
+        IN_STRING: {
+            '\\': (IN_STRING_ESCAPE, IGNORE),
+            '"': (DEFAULT, ACCUMULATE),
+            ...: (IN_STRING, ACCUMULATE),
+        },
+        IN_STRING_ESCAPE: {
+            ...: (IN_STRING, ACCUMULATE),
+        },
+    }
+    cursor = 0
+    state = DEFAULT
+    token = ""
+    all_tokens = []
+    while cursor < len(raw_options):
+        char = raw_options[cursor]
+        cursor += 1
+        tr = transitions[state]
+        state, action = tr.get(char, tr[...])
+        if action == NEW_TOKEN:
+            all_tokens.append(token)
+            token = ""
+        elif action == ACCUMULATE:
+            token += char
+        elif action == IGNORE:
+            pass
+    all_tokens.append(token)
+
+    return {
+        parse_option(opt)
+        for opt in all_tokens
+    }
 
 def parse_block_title(raw_title: str) -> ParsedBlockTitle:
     """
@@ -41,7 +120,7 @@ def parse_block_title(raw_title: str) -> ParsedBlockTitle:
     @param raw_title title as returned by Directive.arguments[0]
     @return a parsed title object
     """
-    m = re.match(r"((?P<lexer>[^(,]*),)?(?P<name>[^(,]*)(?P<options>\(.*\))?", raw_title)
+    m = re.match(r"^((?P<lexer>[^(,]*),)?(?P<name>[^(,]*)(?P<options>\(.*\))?$", raw_title.strip())
 
     if m is None:
         message = (
@@ -56,14 +135,7 @@ def parse_block_title(raw_title: str) -> ParsedBlockTitle:
     if lexer is not None:
         lexer = lexer.strip()
 
-    options = m.group("options")
-    if options is None:
-        options = set()
-    else:
-        options = {
-            opt.strip().upper()
-            for opt in options[1:-1].split(',')
-        }
+    options = parse_block_title_options(m.group("options"))
 
     return ParsedBlockTitle(
         name = name,

@@ -20,7 +20,7 @@ class TestBlockTitle(TestCase):
 		self.assertEqual(parsed_title.name, "The title")
 		self.assertEqual(parsed_title.options, {'SOME OPTIONS'})
 
-		raw_title = "Another title (multiple, options)"
+		raw_title = "Another title (multiple, options) "
 		parsed_title = parse_block_title(raw_title)
 		self.assertIsNone(parsed_title.lexer)
 		self.assertEqual(parsed_title.name, "Another title")
@@ -37,6 +37,19 @@ class TestBlockTitle(TestCase):
 		self.assertEqual(parsed_title.lexer, "C++")
 		self.assertEqual(parsed_title.name, "Hello world")
 		self.assertEqual(parsed_title.options, {'AGAIN'})
+
+	def test_parser_advanced(self):
+		raw_title = r'C++, Change stuff (insert in {{bla}} after "hey, there is a comma and a parenthese ), how nice?")'
+		parsed_title = parse_block_title(raw_title)
+		self.assertEqual(parsed_title.lexer, "C++")
+		self.assertEqual(parsed_title.name, "Change stuff")
+		self.assertEqual(parsed_title.options, {('INSERT AFTER', "bla", "hey, there is a comma and a parenthese ), how nice?")})
+
+		raw_title = r'Change stuff again (insert in {{foo}} before "there are \"escaped\" things", hidden)'
+		parsed_title = parse_block_title(raw_title)
+		self.assertIsNone(parsed_title.lexer)
+		self.assertEqual(parsed_title.name, "Change stuff again")
+		self.assertEqual(parsed_title.options, {'HIDDEN', ('INSERT BEFORE', "foo", 'there are "escaped" things')})
 
 class TestLitConfig(TestCase):
 	def test_parser(self):

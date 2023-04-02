@@ -14,6 +14,7 @@ This means that the language parser is "Language", the reference name of the blo
 
  - **APPEND** Add the content of this block to the previous blocks with the same name
  - **REPLACE** Replace the content of this block
+ - **INSERT IN {{foo}} AFTER "bar"** Replace the content of the "foo" previously defined block by inserting the content of this block after the first line that matches "bar".
 
 Append and replace require that the block has already been defined, and only work within the same document for now.
 
