@@ -172,6 +172,8 @@ class LiterateDirective(SphinxCodeBlock):
             block_node.children = new_children
 
         block_node['classes'].append("lit-block-wrapper")
+        if self.lit.hidden:
+            block_node['classes'].append("lit-block-hidden")
         return block_node
 
     def wrap_literal_node(self, raw_literal_node):

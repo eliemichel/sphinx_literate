@@ -148,6 +148,7 @@ class LiterateNode(nodes.General, nodes.Element):
             metadata = {
                 'name': node.lit.name,
                 'permalink': "#" + node.lit.target['refid'],
+                'hidden': node.lit.hidden,
                 'replaced by': [],
                 'completed in': [],
                 'patched by': [],

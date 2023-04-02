@@ -99,6 +99,9 @@ class CodeBlock:
     # The index of the block in the child list
     child_index: int = 0
 
+    # Hide by default in HTML
+    hidden: bool = False
+
     @classmethod
     def build_key(cls, name: str, tangle_root: str | None = None) -> Key:
         if tangle_root is None:
@@ -292,6 +295,7 @@ class CodeBlockRegistry:
             (x[0] if type(x) == tuple else x): x
             for x in options
         }
+        lit.hidden = 'HIDDEN' in options
         if 'APPEND' in options:
             self._override_codeblock(lit, 'APPEND')
         elif 'REPLACE' in options:

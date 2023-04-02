@@ -18,6 +18,7 @@ class Options {
 			showReferenceDetails: false,
 			showReferenceLinks: false,
 			showHiddenLinks: false,
+			showHiddenBlocks: false,
 		}
 
 		for (const [key, value] of Object.entries(this.defaultOptions)) {
@@ -84,6 +85,13 @@ body:not([data-theme="light"]) {
   color: inherit;
   height: 1rem;
   width: 1rem;
+}
+
+.lit-block-hidden {
+	display: none;
+}
+body[data-lit-block-show-hidden="true"] .lit-block-hidden {
+	display: block;	
 }
 `;
 
@@ -360,6 +368,7 @@ function onDOMContentLoaded() {
 		"lit-opts-show-reference-details": "showReferenceDetails",
 		"lit-opts-show-reference-links": "showReferenceLinks",
 		"lit-opts-show-hidden-links": "showHiddenLinks",
+		"lit-opts-show-hidden-blocks": "showHiddenBlocks",
 	}
 	for (const [id, opt] of Object.entries(checkboxIdToOption)) {
 		const input = document.getElementById(id);
@@ -369,5 +378,10 @@ function onDOMContentLoaded() {
 			options.set(opt, input.checked);
 		});
 	}
+
+	document.body.setAttribute("data-lit-block-show-hidden", options.get("showHiddenBlocks"));
+	document.addEventListener(options.changedEvent.type, function() {
+		document.body.setAttribute("data-lit-block-show-hidden", options.get("showHiddenBlocks"));
+	});
 }
 document.addEventListener('DOMContentLoaded', onDOMContentLoaded, {once: true});
