@@ -341,6 +341,9 @@ class TestRegistryMerge(TestCase):
             content = ["Line 2"],
         ), ['APPEND'])
 
+        self.assertEqual(len(reg._missing), 1)
+        self.assertEqual(reg._missing[0].key, CodeBlock.build_key("Block A1", "B"))
+
         # Then define in parent
         reg.register_codeblock(CodeBlock(
             name = "Block A1",

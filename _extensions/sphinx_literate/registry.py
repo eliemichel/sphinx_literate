@@ -323,6 +323,22 @@ class CodeBlockRegistry:
             lit.relation_to_prev = 'NEW'
             self._add_codeblock(lit)
 
+        # Notify all children tangles that a new block is defined and thus may
+        # no longer be missing.
+        # Also set lit.prev
+        # FIXME: This is inefficient, maybe we should manage missings
+        # differently (e.g., by not storing them and only testing once the full
+        # register is created.)
+        for child_tangle in self._all_children_tangle_roots(lit.tangle_root):
+            def f(missing):
+                if missing.key == CodeBlock.build_key(lit.name, child_tangle):
+                    child_lit = self.get_by_key(missing.key)
+                    assert(child_lit.prev is None)
+                    child_lit.prev = lit
+                    return False
+                return True
+            self._missing = filter(f, self._missing)
+
     def _add_codeblock(self, lit: CodeBlock) -> None:
         """
         Add a new code block to the repository. If a block already exists with
@@ -504,6 +520,26 @@ class CodeBlockRegistry:
     def _parent_tangle_root(self, tangle_root: str) -> str | None:
         h = self._hierarchy.get(tangle_root)
         return h.parent if h is not None else None
+
+    def _children_tangle_roots(self, tangle_root: str) -> List[str] | None:
+        """Return direct children"""
+        return [
+            h.root
+            for h in self._hierarchy.values()
+            if h.parent == tangle_root
+        ]
+
+    def _all_children_tangle_roots(self, tangle_root: str) -> List[str] | None:
+        """Recursively return all children"""
+        children = self._children_tangle_roots(tangle_root)
+        prev_len_children = -1
+        while len(children) != prev_len_children:
+            prev_len_children = len(children)
+            children = sum([
+                self._children_tangle_roots(child)
+                for child in children
+            ], children)
+        return children
 
     def check_integrity(self):
         """
