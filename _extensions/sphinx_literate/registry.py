@@ -316,6 +316,7 @@ class CodeBlockRegistry:
             modifier.inserted_location = InsertLocation(placement, pattern)
             modifier.inserted_block = lit
             self._override_codeblock(modifier, 'INSERT')
+            assert(modifier.prev is not None or self._missing[-1].key == modifier.key)
 
             lit.relation_to_prev = 'INSERTED'
             lit.prev = modifier
@@ -330,14 +331,16 @@ class CodeBlockRegistry:
         # differently (e.g., by not storing them and only testing once the full
         # register is created.)
         for child_tangle in self._all_children_tangle_roots(lit.tangle_root):
-            def f(missing):
+            new_missing = []
+            for missing in self._missing:
                 if missing.key == CodeBlock.build_key(lit.name, child_tangle):
                     child_lit = self.get_by_key(missing.key)
                     assert(child_lit.prev is None)
+                    assert(child_lit.relation_to_prev not in {'NEW', 'INSERTED'})
                     child_lit.prev = lit
-                    return False
-                return True
-            self._missing = filter(f, self._missing)
+                else:
+                    new_missing.append(missing)
+            self._missing = new_missing
 
     def _add_codeblock(self, lit: CodeBlock) -> None:
         """
@@ -546,6 +549,18 @@ class CodeBlockRegistry:
         Thi is called when the whole doctree has been seen, it checks that
         there is no more missing block otherwise throws an exception.
         """
+        missing_by_key = {
+            missing.key: missing
+            for missing in self._missing
+        }
+        for b in self._blocks.values():
+            bb = b
+            while bb is not None:
+                if bb.prev is None and bb.relation_to_prev != 'NEW':
+                    assert(bb.key in missing_by_key)
+                    assert(missing_by_key[bb.key].relation_to_prev == bb.relation_to_prev)
+                bb = bb.next
+
         for missing in self._missing:
             lit = self.get_by_key(missing.key)
             assert(lit is not None)

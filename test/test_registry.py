@@ -361,5 +361,110 @@ class TestRegistryMerge(TestCase):
             "Line 2",
         ])
 
+    def test_non_linear_parenting_with_insert(self):
+        reg = CodeBlockRegistry()
+        reg.set_tangle_parent("B", "A")
+
+        # First insert in child
+        block_b1 = CodeBlock(
+            name = "Block B1",
+            tangle_root = "B",
+            content = ["Foo"],
+        )
+        reg.register_codeblock(block_b1, [('INSERT', 'Block A1', 'AFTER', "Line 1")])
+
+        self.assertEqual(len(reg._missing), 1)
+        self.assertEqual(reg._missing[0].key, CodeBlock.build_key("Block A1", "B"))
+
+        modifier = reg.get("Block B1", "B").prev
+        self.assertNotEqual(modifier, None)
+        self.assertEqual(modifier.inserted_block, reg.get("Block B1", "B"))
+        self.assertEqual(modifier.prev, None)
+        old_modifier = modifier
+
+        # Then define in parent
+        block_a1 = CodeBlock(
+            name = "Block A1",
+            tangle_root = "A",
+            content = ["Line 1", "Line 2"],
+        )
+        reg.register_codeblock(block_a1)
+
+        reg.check_integrity()
+
+        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+            "Line 1",
+            "Line 2",
+        ])
+        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+            "Line 1",
+            "Foo",
+            "Line 2",
+        ])
+        modifier = reg.get("Block B1", "B").prev
+        self.assertNotEqual(modifier, None)
+        self.assertEqual(modifier.inserted_block, reg.get("Block B1", "B"))
+        self.assertEqual(modifier.prev, reg.get("Block A1", "A"))
+
+        self.assertEqual(block_b1, reg.get("Block B1", "B"))
+        self.assertEqual(block_a1, reg.get("Block A1", "A"))
+        self.assertEqual(modifier, reg.get("Block A1", "B"))
+        self.assertEqual(modifier, old_modifier)
+
+    def test_non_linear_parenting_with_merge(self):
+        reg_a = CodeBlockRegistry()
+        reg_b = CodeBlockRegistry()
+        reg_b.set_tangle_parent("B", "A")
+
+        # First insert in child
+        block_b1 = CodeBlock(
+            name = "Block B1",
+            tangle_root = "B",
+            content = ["Foo"],
+        )
+        reg_b.register_codeblock(block_b1, [('INSERT', 'Block A1', 'AFTER', "Line 1")])
+
+        self.assertEqual(len(reg_b._missing), 1)
+        self.assertEqual(reg_b._missing[0].key, CodeBlock.build_key("Block A1", "B"))
+
+        modifier = reg_b.get("Block B1", "B").prev
+        self.assertNotEqual(modifier, None)
+        self.assertEqual(modifier.inserted_block, reg_b.get("Block B1", "B"))
+        self.assertEqual(modifier.prev, None)
+        old_modifier = modifier
+
+        # Then define in parent
+        block_a1 = CodeBlock(
+            name = "Block A1",
+            tangle_root = "A",
+            content = ["Line 1", "Line 2"],
+        )
+        reg_a.register_codeblock(block_a1)
+
+        reg = reg_b
+        reg.merge(reg_a)
+
+        reg.check_integrity()
+
+        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+            "Line 1",
+            "Line 2",
+        ])
+        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+            "Line 1",
+            "Foo",
+            "Line 2",
+        ])
+        modifier = reg.get("Block B1", "B").prev
+        self.assertNotEqual(modifier, None)
+        self.assertEqual(modifier.inserted_block, reg.get("Block B1", "B"))
+        self.assertEqual(modifier.prev, reg.get("Block A1", "A"))
+
+        self.assertEqual(block_b1, reg.get("Block B1", "B"))
+        self.assertEqual(block_a1, reg.get("Block A1", "A"))
+        self.assertEqual(modifier, reg.get("Block A1", "B"))
+        self.assertEqual(modifier, old_modifier)
+        
+
 if __name__ == "__main__":
     main()
