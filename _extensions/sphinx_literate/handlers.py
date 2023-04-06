@@ -34,6 +34,11 @@ def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
     registry = CodeBlockRegistry.from_env(app.builder.env)
     registry.check_integrity()
 
+    x = registry.get_by_key("Opening a window##Dependency subdirectories")
+    print("== xxx ==")
+    print(f"lit {hex(id(x))} = {x.format()} [{x.relation_to_prev}], lit.prev = {x.prev.format()} [{x.prev.relation_to_prev}]")
+    print(f"lit.prev.prev = {x.prev.prev.format() if x.prev.prev is not None else 'None'}")
+
     has_literate_node = False
     for literate_node in doctree.findall(LiterateNode):
         has_literate_node = True
@@ -45,6 +50,16 @@ def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
             registry.get_by_key(k)
             for k in registry.references_to_key(literate_node.lit.key)
         ]
+
+        # Fix references broken by serialization
+        literate_node.lit = registry.get_by_uid(literate_node.lit.uid)
+        lit = literate_node.lit
+        check_lit = registry.get_rec_by_key(lit.key)
+        if check_lit != lit:
+            print(f"check_lit<{hex(id(check_lit))}> = {check_lit.format()}, lit<{hex(id(lit))}> = {lit.format()}")
+            print(f"check_lit.next = {check_lit.next is not None}")
+            print(f"lit.next = {lit.next is not None}")
+            assert(False)
 
     for tangle_node in doctree.findall(TangleNode):
 

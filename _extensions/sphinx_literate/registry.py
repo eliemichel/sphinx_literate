@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict, Set, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
+import random
 
 from sphinx.errors import ExtensionError
 
@@ -69,6 +70,10 @@ class CodeBlock:
     lexer: str | None = None
 
     # NB: Fields bellow are handled by the registry
+
+    # Unique identifier, used for recovery after deserializing (which Sphinx
+    # does when pickling)
+    uid: str | None = None
 
     # A block has children when it gets appended/replaced some content in later
     # blocks (this is a basic doubly linked list)
@@ -277,6 +282,10 @@ class CodeBlockRegistry:
         # parallel units.
         self._missing: List[MissingCodeBlock] = []
 
+    @classmethod
+    def create_uid(cls):
+        return ''.join([random.choice(['123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ']) for _ in range(16)])
+
     def register_codeblock(self, lit: CodeBlock, options: BlockOptions = set()) -> None:
         """
         Add a new code block to the repository. The behavior depends on the
@@ -293,6 +302,9 @@ class CodeBlockRegistry:
         @param lit block to register
         @param options the options
         """
+        assert(lit.uid is None)
+        lit.uid = self.create_uid()
+
         opt_dict = {
             (x[0] if type(x) == tuple else x): x
             for x in options
@@ -525,6 +537,14 @@ class CodeBlockRegistry:
     def get_rec_by_key(self, key: Key, override_tangle_root: str | None = None) -> CodeBlock:
         tangle_root, name = key.split("##")
         return self.get_rec(name, tangle_root, override_tangle_root)
+
+    def get_by_uid(self, uid: str) -> CodeBlock | None:
+        for b in self._blocks.values():
+            bb = b
+            while bb is not None:
+                if bb.uid == uid:
+                    return bb
+                bb = bb.next
 
     def keys(self) -> dict_keys:
         return self._blocks.keys()
