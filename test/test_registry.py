@@ -199,6 +199,8 @@ class TestRegistryMerge(TestCase):
         self.assertEqual(list(reg_a.get("Block A1", "A").all_content()), ["A1"])
         self.assertEqual(list(reg_a.get("Block A1", "B").all_content()), ["B2"])
 
+        self.assertEqual(reg_a.get("Block A1", "B").prev, reg_a.get("Block A1", "A"))
+
         reg_a.check_integrity()
 
     def test_merge_hierarchies(self):
@@ -444,6 +446,8 @@ class TestRegistryMerge(TestCase):
         reg = reg_b
         reg.merge(reg_a)
 
+        self.assertNotEqual(reg.get("Block A1", "A"), None)
+        self.assertEqual(reg._missing, [])
         reg.check_integrity()
 
         self.assertEqual(list(reg.get("Block A1", "A").all_content()), [

@@ -238,7 +238,9 @@ class MissingCodeBlock:
     blocks are resolved when combining multiple registers comming from
     parallel units.
     """
+    # The key of the referee, that expected its 'prev' to exist
     key: Key
+    # The relation of the referee to the expected block
     relation_to_prev: str
 
 #############################################################
@@ -324,12 +326,17 @@ class CodeBlockRegistry:
             lit.relation_to_prev = 'NEW'
             self._add_codeblock(lit)
 
-        # Notify all children tangles that a new block is defined and thus may
-        # no longer be missing.
-        # Also set lit.prev
-        # FIXME: This is inefficient, maybe we should manage missings
-        # differently (e.g., by not storing them and only testing once the full
-        # register is created.)
+        self._fix_missing_referess(lit)
+
+    def _fix_missing_referess(self, lit):
+        """
+        Notify all children tangles that a new block `lit` is defined and thus
+        may no longer be missing.
+        Also set child_lit.prev
+        FIXME: This is inefficient, maybe we should manage missings
+        differently (e.g., by not storing them and only testing once the full
+        register is created.)
+        """
         for child_tangle in self._all_children_tangle_roots(lit.tangle_root):
             new_missing = []
             for missing in self._missing:
@@ -376,7 +383,7 @@ class CodeBlockRegistry:
         lit.relation_to_prev = relation_to_prev
 
         existing = self.get_rec(lit.name, lit.tangle_root)
-
+        
         if existing is None:
             self._missing.append(
                 MissingCodeBlock(lit.key, lit.relation_to_prev)
@@ -414,6 +421,8 @@ class CodeBlockRegistry:
                 self._add_codeblock(lit)
             else:
                 self._override_codeblock(lit, lit.relation_to_prev)
+            self._fix_missing_referess(lit)
+            self.check_integrity(allow_missing=True)
 
         # Merge cross-references
         for key, refs in other._references.items():
@@ -457,7 +466,13 @@ class CodeBlockRegistry:
             def isStillUnresolved(missing):
                 missing_tangle_root, missing_name = missing.key.split("##")
                 if missing_tangle_root == tangle_root:
-                    if self.get_rec_by_key(missing.key) is not None:
+                    child_lit = self.get_by_key(missing.key)
+                    if child_lit is not None:
+                        assert(child_lit.prev is None)
+                        assert(child_lit.relation_to_prev not in {'NEW', 'INSERTED'})
+                        child_lit.prev = self.get_rec(child_lit.name, parent)
+                        assert(child_lit.prev is not None)
+                        assert(child_lit.prev.tangle_root != child_lit.tangle_root)
                         return False
                 return True
             self._missing = list(filter(isStillUnresolved, self._missing))
@@ -544,7 +559,7 @@ class CodeBlockRegistry:
             ], children)
         return children
 
-    def check_integrity(self):
+    def check_integrity(self, allow_missing=False):
         """
         Thi is called when the whole doctree has been seen, it checks that
         there is no more missing block otherwise throws an exception.
@@ -560,6 +575,9 @@ class CodeBlockRegistry:
                     assert(bb.key in missing_by_key)
                     assert(missing_by_key[bb.key].relation_to_prev == bb.relation_to_prev)
                 bb = bb.next
+
+        if allow_missing:
+            return
 
         for missing in self._missing:
             lit = self.get_by_key(missing.key)
