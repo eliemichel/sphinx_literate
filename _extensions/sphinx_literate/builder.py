@@ -61,6 +61,7 @@ class TangleBuilder(Builder):
         # Tangle only at the end to account for unordered definitions and inheritance
         registry = CodeBlockRegistry.from_env(self.env)
         for tangle_root in registry.all_tangle_roots():
+            self.processed_files = set()
 
             # Tangle blocks
             for lit in registry.blocks_by_root(tangle_root):
@@ -88,6 +89,16 @@ class TangleBuilder(Builder):
         registry = CodeBlockRegistry.from_env(self.env)
         assert(lit.name.startswith("file:"))
         filename = lit.name[len("file:"):].strip()
+        
+        # Easy mistake guard
+        if filename in self.processed_files:
+            message = (
+                f"There are two different blocks with a name 'file: {filename}' that " +
+                f"only differ from spaces after 'file:', this is likely a mistake."
+            )
+            raise ExtensionError(message, modname="sphinx_literate")
+        self.processed_files.add(filename)
+
         if tangle_root is not None:
             filename = join(tangle_root, filename)
 
