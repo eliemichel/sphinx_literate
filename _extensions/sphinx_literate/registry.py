@@ -135,11 +135,19 @@ class CodeBlock:
             child_index += 1
             lit = lit.next
 
-    def all_content(self):
+    def all_content(self, registry: CodeBlockRegistry, tangle_root: str | None = None):
         """
         Iterate on all lines of content, including children, and overridden
         parent.
+        @param registry must be provided to resolve inserted blocks correctly.
+        @param tangle_root is the root from which this content is evaluated.
+                           It may differs from the block's tangle in case of
+                           inheritance and the content of the block is
+                           different if referencing inserted blocks that are
+                           redefined in children.
         """
+        if tangle_root is None:
+            tangle_root = self.tangle_root
 
         # Find the last REPLACE of the chain
         start = self
@@ -168,7 +176,10 @@ class CodeBlock:
             for pattern, nodes in insert_nodes[placement].items():
                 if pattern in l:
                     for n in nodes:
-                        for ll in n.inserted_block.all_content():
+                        inserted_block = n.inserted_block
+                        if registry is not None:
+                            inserted_block = registry.get_rec_by_key(n.inserted_block.key, override_tangle_root=tangle_root)
+                        for ll in inserted_block.all_content(tangle_root):
                             yield ll
                     matched.append(pattern)
             for pattern in matched:
@@ -184,7 +195,7 @@ class CodeBlock:
         # If no replace, maybe add source from the parent tangle
         if start.prev is not None and start.relation_to_prev in {'APPEND', 'INSERT'}:
             assert(start.prev.tangle_root != start.tangle_root)
-            for l in start.prev.all_content():
+            for l in start.prev.all_content(tangle_root):
                 for ll in maybeInsert(l):
                     yield ll
 

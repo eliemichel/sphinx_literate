@@ -48,7 +48,7 @@ class TestRegistryMerge(TestCase):
         reg_a.merge(reg_b)
 
         self.assertEqual(reg_a._missing, [])
-        self.assertEqual(list(reg_a.get("Block A1").all_content()), ["B2"])
+        self.assertEqual(list(reg_a.get("Block A1").all_content(reg_a)), ["B2"])
 
         reg_a.check_integrity()
 
@@ -155,8 +155,8 @@ class TestRegistryMerge(TestCase):
 
         # B is child of A -> merged 'replace' op
         self.assertEqual(reg_a._missing, [])
-        self.assertEqual(list(reg_a.get("Block A1", "A").all_content()), ["A1"])
-        self.assertEqual(list(reg_a.get("Block A1", "B").all_content()), ["B2"])
+        self.assertEqual(list(reg_a.get("Block A1", "A").all_content(reg_a)), ["A1"])
+        self.assertEqual(list(reg_a.get("Block A1", "B").all_content(reg_a)), ["B2"])
 
         reg_a.check_integrity()
 
@@ -196,8 +196,8 @@ class TestRegistryMerge(TestCase):
 
         # B is child of A -> merged 'replace' op
         self.assertEqual(reg_a._missing, [])
-        self.assertEqual(list(reg_a.get("Block A1", "A").all_content()), ["A1"])
-        self.assertEqual(list(reg_a.get("Block A1", "B").all_content()), ["B2"])
+        self.assertEqual(list(reg_a.get("Block A1", "A").all_content(reg_a)), ["A1"])
+        self.assertEqual(list(reg_a.get("Block A1", "B").all_content(reg_a)), ["B2"])
 
         self.assertEqual(reg_a.get("Block A1", "B").prev, reg_a.get("Block A1", "A"))
 
@@ -241,7 +241,7 @@ class TestRegistryMerge(TestCase):
             content = ["lines"],
         ), ['APPEND'])
 
-        self.assertEqual(list(reg.get("Block A1").all_content()), [
+        self.assertEqual(list(reg.get("Block A1").all_content(reg)), [
             "Hello, world",
             "Inserted",
             "lines",
@@ -275,12 +275,12 @@ class TestRegistryMerge(TestCase):
         self.assertEqual(block_A2_B.relation_to_prev, 'INSERTED')
         self.assertEqual(block_A1_B.prev, block_A1_A)
 
-        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "A").all_content(reg)), [
             "Hello, world",
             "Lorem ipsum",
         ])
 
-        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "B").all_content(reg)), [
             "Hello, world",
             "Inserted",
             "lines",
@@ -320,12 +320,12 @@ class TestRegistryMerge(TestCase):
         self.assertEqual(block_A2_B.relation_to_prev, 'INSERTED')
         self.assertEqual(block_A1_B.prev, block_A1_A)
 
-        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "A").all_content(reg)), [
             "Hello, world",
             "Lorem ipsum",
         ])
 
-        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "B").all_content(reg)), [
             "Hello, world",
             "Inserted",
             "lines",
@@ -355,10 +355,10 @@ class TestRegistryMerge(TestCase):
 
         reg.check_integrity()
 
-        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "A").all_content(reg)), [
             "Line 1",
         ])
-        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "B").all_content(reg)), [
             "Line 1",
             "Line 2",
         ])
@@ -394,11 +394,11 @@ class TestRegistryMerge(TestCase):
 
         reg.check_integrity()
 
-        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "A").all_content(reg)), [
             "Line 1",
             "Line 2",
         ])
-        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "B").all_content(reg)), [
             "Line 1",
             "Foo",
             "Line 2",
@@ -450,11 +450,11 @@ class TestRegistryMerge(TestCase):
         self.assertEqual(reg._missing, [])
         reg.check_integrity()
 
-        self.assertEqual(list(reg.get("Block A1", "A").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "A").all_content(reg)), [
             "Line 1",
             "Line 2",
         ])
-        self.assertEqual(list(reg.get("Block A1", "B").all_content()), [
+        self.assertEqual(list(reg.get("Block A1", "B").all_content(reg)), [
             "Line 1",
             "Foo",
             "Line 2",
@@ -468,6 +468,46 @@ class TestRegistryMerge(TestCase):
         self.assertEqual(block_a1, reg.get("Block A1", "A"))
         self.assertEqual(modifier, reg.get("Block A1", "B"))
         self.assertEqual(modifier, old_modifier)
+
+    def test_insert_then_replace(self):
+        reg = CodeBlockRegistry()
+        reg.register_codeblock(CodeBlock(
+            name = "Block A1",
+            tangle_root = "A",
+            content = ["Hello, world", "Lorem ipsum"],
+        ))
+
+        reg.set_tangle_parent("B", "A")
+        reg.register_codeblock(CodeBlock(
+            name = "Block A2",
+            tangle_root = "B",
+            content = ["Inserted"],
+        ), [('INSERT', 'Block A1', 'AFTER', "Hello")])
+
+        reg.set_tangle_parent("C", "B")
+        reg.register_codeblock(CodeBlock(
+            name = "Block A2",
+            tangle_root = "C",
+            content = ["lines"],
+        ), ['APPEND'])
+
+        self.assertEqual(list(reg.get_rec("Block A1", "A").all_content(reg, "A")), [
+            "Hello, world",
+            "Lorem ipsum",
+        ])
+
+        self.assertEqual(list(reg.get_rec("Block A1", "B").all_content(reg, "B")), [
+            "Hello, world",
+            "Inserted",
+            "Lorem ipsum",
+        ])
+
+        self.assertEqual(list(reg.get_rec("Block A1", "C").all_content(reg, "C")), [
+            "Hello, world",
+            "Inserted",
+            "lines",
+            "Lorem ipsum",
+        ])
         
 
 if __name__ == "__main__":
