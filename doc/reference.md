@@ -45,6 +45,8 @@ The `lit-setup` directive can be used to setup local options.
 
  - **parent** The tangle root from which this one inherits.
 
+ - **fetch-files** Extra files to copy to the tangled directory. This is a sequence of zip paths relative to the documentation where the setup directive is.
+
 For instance:
 
 ````
