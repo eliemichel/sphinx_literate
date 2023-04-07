@@ -473,6 +473,13 @@ class CodeBlockRegistry:
                     f"  But trying to set to '{parent}' in {source_location.format()}.\n"
                 )
                 raise ExtensionError(message, modname="sphinx_literate")
+            existing.fetch_files += fetch_files
+        elif tangle_root == parent:
+            message = (
+                f"A tangle root cannot be its own parent! \n" +
+                f"  For tangle root '{tangle_root}' in {source_location.format()}.\n"
+            )
+            raise ExtensionError(message, modname="sphinx_literate")
         else:
             self._hierarchy[tangle_root] = TangleHierarchyEntry(
                 root = tangle_root,
@@ -597,6 +604,18 @@ class CodeBlockRegistry:
     def get_tangle_info(self, tangle_root: str) -> TangleHierarchyEntry:
         return self._hierarchy.get(tangle_root)
 
+    def all_tangle_fetch_files(self, tangle_root) -> List[(Path, SourceLocation)]:
+        fetch_files = []
+        h = self._hierarchy.get(tangle_root)
+        while h is not None:
+            fetch_files += [
+                (f, h.source_location)
+                for f in h.fetch_files
+            ]
+            h = self._hierarchy.get(h.parent)
+        h = self._hierarchy.get(tangle_root)
+        return fetch_files
+
     def _parent_tangle_root(self, tangle_root: str) -> str | None:
         h = self._hierarchy.get(tangle_root)
         return h.parent if h is not None else None
@@ -611,15 +630,15 @@ class CodeBlockRegistry:
 
     def _all_children_tangle_roots(self, tangle_root: str) -> List[str] | None:
         """Recursively return all children"""
-        children = self._children_tangle_roots(tangle_root)
+        children = set(self._children_tangle_roots(tangle_root))
         prev_len_children = -1
         while len(children) != prev_len_children:
             prev_len_children = len(children)
-            children = sum([
-                self._children_tangle_roots(child)
-                for child in children
-            ], children)
-        return children
+            for child in list(children):  # iterate on a copy
+                children.update(
+                    self._children_tangle_roots(child)
+                )
+        return list(children)
 
     def check_integrity(self, allow_missing=False):
         """
