@@ -12,6 +12,7 @@ from .tangle import tangle
 from .utils import print_traceback
 
 from docutils import nodes
+from sphinx.errors import ExtensionError
 
 ####################################################
 
@@ -37,9 +38,16 @@ def process_literate_nodes(app: Sphinx, doctree, fromdocname: str):
     has_literate_node = False
     for literate_node in doctree.findall(LiterateNode):
         has_literate_node = True
+
+        # This check should not be needed if the registry was doing its job...
+        for uid, link in literate_node.uid_to_block_link.items():
+            if registry.get_rec_by_key(link.key) is None:
+                missing_tangle_root, missing_name = link.key.split("##")
+                raise ExtensionError(f"Reference to an invalid block: '{missing_name}' (in tangle root '{missing_tangle_root}')")
+
         literate_node.uid_to_lit = {
-            h: (registry.get_rec_by_key(link.key), link.options)
-            for h, link in literate_node.uid_to_block_link.items()
+            uid: (registry.get_rec_by_key(link.key), link.options)
+            for uid, link in literate_node.uid_to_block_link.items()
         }
         literate_node.references = [
             registry.get_by_key(k)
