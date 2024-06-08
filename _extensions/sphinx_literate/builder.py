@@ -60,6 +60,11 @@ class TangleBuilder(Builder):
     def finish(self) -> None:
         # Tangle only at the end to account for unordered definitions and inheritance
         registry = CodeBlockRegistry.from_env(self.env)
+        
+        # FIXME: Previous calls to _fix_missing_referees are not enough, so
+        # here we iterate over everything to force fix missing references
+        registry.try_fixing_all_missing()
+
         for tangle_root in registry.all_tangle_roots():
             self.processed_files = set()
 
@@ -108,6 +113,9 @@ class TangleBuilder(Builder):
             self.app.config,
             lit.source_location.format() + ", "
         )
+
+        if not tangled_content:
+            return
 
         outfilename = join(self.outdir, filename)
         ensuredir(dirname(outfilename))

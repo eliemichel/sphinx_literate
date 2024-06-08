@@ -99,6 +99,24 @@ Document parsing is two-fold. We rely on a host/transport format that is any for
 
 The second step of parsing consists in analyzing the content of code fragments to detect references to other fragments. This process may or may not be aware of the underlying programming language.
 
+Symmetrically, the document generation consists in a step that is proper to the literate programming tool, which generates source/content for the more generic documentation framework or markup (e.g., (La)TeX, HTML, Sphinx nodes).
+
+## Limitations
+
+### Ambiguity
+
+Problematic case:
+
+ 1. In parent revision, define a fragment Test that contains "foo"
+ 2. In a child revision, define a fragment Test with 'prepend' relation to previous and that contains "bar"
+ 3. In this same child revision, define a fragment Test with 'append' relation to previous and that contains "baz"
+
+Should the result be "foo bar baz" or "foo baz bar"? In other terms, should the fragment added in step 3 be appended to the one added in step 2, which is itself prepended to the parent?
+
+### Tooling
+
+Missing a tool for debugging which line of code comes from which journey across the assembly of fragments.
+
 ## References
 
 ```
